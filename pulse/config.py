@@ -38,6 +38,21 @@ class ConfigError(ValueError):
 
 
 @dataclass(frozen=True)
+class Product:
+    name: str
+    url: str
+    summary: str
+
+
+@dataclass(frozen=True)
+class Work:
+    title: str
+    company: str
+    company_url: str
+    products: tuple[Product, ...] = ()
+
+
+@dataclass(frozen=True)
 class Profile:
     login: str
     handle: str
@@ -49,6 +64,8 @@ class Profile:
     focus: tuple[str, ...]
     stack: tuple[str, ...]
     links: tuple[tuple[str, str], ...]
+    kind: str = "Engineer"
+    work: Work | None = None
 
     @property
     def tz(self) -> ZoneInfo:
@@ -99,6 +116,51 @@ def parse_profile(raw: object) -> Profile:
         focus=_str_list(raw, "focus"),
         stack=_str_list(raw, "stack"),
         links=tuple(links.items()),
+        kind=_kind(raw.get("kind", "Engineer")),
+        work=_work(raw.get("work")),
+    )
+
+
+def _kind(value: object) -> str:
+    if not isinstance(value, str) or not value.isalnum():
+        raise ConfigError("profile.kind must be a single alphanumeric word, e.g. DataScientist")
+    return value
+
+
+def _https(key: str, value: object) -> str:
+    if not isinstance(value, str) or not value.startswith("https://"):
+        raise ConfigError(f"profile.{key} must be an https:// URL")
+    _check_inline(key, value)
+    return value
+
+
+def _text(key: str, value: object) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ConfigError(f"profile.{key} must be a non-empty string")
+    _check_inline(key, value)
+    return value.strip()
+
+
+def _work(raw: object) -> Work | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ConfigError("profile.work must be a mapping")
+    products = raw.get("products") or []
+    if not isinstance(products, list) or not all(isinstance(p, dict) for p in products):
+        raise ConfigError("profile.work.products must be a list of mappings")
+    return Work(
+        title=_text("work.title", raw.get("title")),
+        company=_text("work.company", raw.get("company")),
+        company_url=_https("work.company_url", raw.get("company_url")),
+        products=tuple(
+            Product(
+                name=_text("work.products.name", p.get("name")),
+                url=_https("work.products.url", p.get("url")),
+                summary=_text("work.products.summary", p.get("summary")),
+            )
+            for p in products
+        ),
     )
 
 

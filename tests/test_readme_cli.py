@@ -10,6 +10,7 @@ from pulse import __main__ as cli
 from pulse import readme
 
 README = """# hi
+<!-- pulse:work --><!-- /pulse:work -->
 <!-- pulse:manifest -->
 old
 <!-- /pulse:manifest -->
@@ -80,7 +81,7 @@ def test_cli_renders_all_assets_and_readme(workspace):
     files = sorted(p.name for p in (workspace / "assets").iterdir())
     assert len(files) == 16
     assert "status-dark.svg" in files and "pods-light.svg" in files
-    assert "kind: Engineer" in (workspace / "README.md").read_text(encoding="utf-8")
+    assert "apiVersion: human.dev/v1" in (workspace / "README.md").read_text(encoding="utf-8")
     assert json.loads((workspace / "out.json").read_text())["login"] == "octo"
 
 
@@ -130,3 +131,32 @@ def test_small_denied_share_still_publishes(snapshot, caplog):
     cli.check_completeness(big)
     assert "refused" in caplog.text
     cli.check_completeness(replace(snapshot, meta={}))
+
+
+def test_work_banner_and_manifest_escape_and_render(snapshot):
+    from conftest import PROFILE_RAW
+
+    from pulse.config import parse_profile
+
+    raw = {
+        **PROFILE_RAW,
+        "kind": "DataScientist",
+        "work": {
+            "title": "Data Scientist",
+            "company": "Acme <Labs>",
+            "company_url": "https://acme.example/",
+            "products": [{"name": "Lens", "url": "https://lens.example/", "summary": "LLM & k8s"}],
+        },
+    }
+    profile = parse_profile(raw)
+    banner = readme.work_banner(profile)
+    assert "Acme &lt;Labs&gt;" in banner and "<Labs>" not in banner
+    assert '<a href="https://lens.example/"><b>Lens</b></a> — LLM &amp; k8s' in banner
+    text = readme.manifest(profile, snapshot)
+    assert "kind: DataScientist" in text
+    assert "employer: Acme <Labs>  # https://acme.example/" in text
+    assert "    - Lens: LLM & k8s" in text
+
+
+def test_work_banner_empty_without_work(profile):
+    assert readme.work_banner(profile) == ""

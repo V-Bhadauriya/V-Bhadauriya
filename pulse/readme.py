@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable, Mapping
+from html import escape
 
 from pulse import metrics
 from pulse.config import Profile
@@ -49,7 +50,7 @@ def manifest(profile: Profile, snapshot: Snapshot) -> str:
     lines = [
         "```yaml",
         "apiVersion: human.dev/v1",
-        "kind: Engineer",
+        f"kind: {profile.kind}",
         "metadata:",
         f"  name: {profile.handle}",
         "  labels:",
@@ -57,6 +58,7 @@ def manifest(profile: Profile, snapshot: Snapshot) -> str:
         f"    region: {profile.region}",
         "spec:",
         f"  displayName: {profile.display_name}",
+        *_work_manifest(profile),
         "  focus:",
         *(f"    - {item}" for item in profile.focus),
         f"  stack: [{', '.join(profile.stack)}]",
@@ -70,6 +72,31 @@ def manifest(profile: Profile, snapshot: Snapshot) -> str:
         )
     lines.append("```")
     return "\n".join(lines)
+
+
+def _work_manifest(profile: Profile) -> list[str]:
+    work = profile.work
+    if work is None:
+        return []
+    return [
+        f"  employer: {work.company}  # {work.company_url}",
+        *(["  building:"] if work.products else []),
+        *(f"    - {p.name}: {p.summary}" for p in work.products),
+    ]
+
+
+def work_banner(profile: Profile) -> str:
+    """Clickable one-liner about the current role (HTML, every value escaped)."""
+    work = profile.work
+    if work is None:
+        return ""
+    company = f'<a href="{escape(work.company_url)}"><b>{escape(work.company)}</b></a>'
+    lines = [f"<b>{escape(work.title)}</b> at {company}"]
+    lines += [
+        f'building <a href="{escape(p.url)}"><b>{escape(p.name)}</b></a> — {escape(p.summary)}'
+        for p in work.products
+    ]
+    return "<br>\n".join(lines)
 
 
 def _recently_shipped(snapshot: Snapshot) -> list[str]:

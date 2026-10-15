@@ -113,6 +113,7 @@ def write_outputs(args: argparse.Namespace, profile: Profile, fetched: FetchResu
     updated = readme.replace_sections(
         current,
         {
+            "work": readme.work_banner(profile),
             "manifest": readme.manifest(profile, snapshot),
             "links": readme.links(profile),
             "footer": readme.footer(snapshot),

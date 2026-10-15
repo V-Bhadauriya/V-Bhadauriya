@@ -26,6 +26,14 @@ def test_parse_profile_valid(profile):
         ({"stack": "Go"}, "stack"),
         ({"tagline": "```\nbreakout"}, "backticks"),
         ({"focus": ["ok", "`x`"]}, "backticks"),
+        ({"kind": "Data Scientist"}, "kind"),
+        ({"work": "nope"}, "work"),
+        ({"work": {"title": "DS", "company": "A", "company_url": "http://x"}}, "company_url"),
+        ({"work": {"title": "", "company": "A", "company_url": "https://x"}}, "work.title"),
+        (
+            {"work": {"title": "DS", "company": "A", "company_url": "https://x", "products": [1]}},
+            "products",
+        ),
     ],
 )
 def test_parse_profile_rejects_invalid(patch, message):
@@ -50,6 +58,7 @@ def test_load_profile_missing_and_invalid(tmp_path):
 def test_load_profile_real_file():
     profile = load_profile(__import__("pathlib").Path("profile.yml"))
     assert profile.login == "V-Bhadauriya"
+    assert profile.work is not None and profile.work.products[0].name == "NirikshaAI"
 
 
 def test_snapshot_round_trip(snapshot):

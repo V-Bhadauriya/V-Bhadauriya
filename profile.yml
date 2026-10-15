@@ -4,25 +4,41 @@
 login: V-Bhadauriya
 handle: vivek.bhadauriya
 display_name: Vivek Singh Bhadauriya
-tagline: platform engineer · observability · k8s · OTel
-role: platform-engineer
+kind: DataScientist
+tagline: data scientist · LLMs · ML · k8s · observability
+role: data-scientist
 region: us-west (Fremont, CA)
 timezone: America/Los_Angeles
 
+work:
+  title: Data Scientist
+  company: SAN Data Systems
+  company_url: https://sandatasystem.ai/
+  products:
+    - name: NirikshaAI
+      url: https://niriksha.ai/
+      summary: AI-native observability for LLMs, agents, RAG and Kubernetes
+
 focus:
-  - OpenTelemetry instrumentation & SDKs
-  - Kubernetes platform engineering
-  - Cloud-native APIs in Go and Python
+  - Machine learning & LLM systems (agents, RAG, evaluation)
+  - LLM observability & AI security (prompt-injection, PII) at NirikshaAI
+  - MLOps on Kubernetes (GPU workloads, model serving, Helm)
+  - OpenTelemetry SDKs & tracing (Go, Python, Node, Java)
 
 stack:
-  - Go
   - Python
+  - Go
   - TypeScript
   - Java
+  - LLMs
+  - RAG
+  - MLOps
   - Kubernetes
   - Helm
   - OpenTelemetry
   - FastAPI
 
 links:
+  niriksha.ai: https://niriksha.ai/
+  sandatasystem.ai: https://sandatasystem.ai/
   github: https://github.com/V-Bhadauriya
