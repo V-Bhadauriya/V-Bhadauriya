@@ -120,3 +120,16 @@ def test_activity_counters(snapshot):
 def test_timeseries_scale_ceiling():
     assert timeseries._nice_ceiling(511) == 600
     assert timeseries._nice_ceiling(2500) == 3000
+
+
+def test_toolchain_layout_wraps_and_sizes():
+    from pulse.config import StackGroup
+    from pulse.render import toolchain
+
+    items = tuple(f"tool-{i:02d}" for i in range(20))
+    lines = toolchain.layout(items)
+    assert len(lines) > 1
+    assert all(x + w <= toolchain.CHIPS_RIGHT for line in lines for _, x, w in line)
+    assert [label for line in lines for label, _, _ in line] == list(items)
+    groups = (StackGroup("A", items), StackGroup("B", ("x",)))
+    assert toolchain.height_for(groups) == toolchain.TOP + (len(lines) + 1) * toolchain.LINE_H + 10

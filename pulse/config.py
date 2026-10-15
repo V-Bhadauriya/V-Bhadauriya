@@ -30,7 +30,17 @@ HISTORY_PAGE_SIZE = 50
 PRIVATE_LABEL = "private repo"
 MAX_SVG_BYTES = 100_000
 
-ASSET_NAMES = ("status", "activity", "slo", "timeseries", "heatmap", "trace", "resources", "pods")
+ASSET_NAMES = (
+    "status",
+    "activity",
+    "toolchain",
+    "slo",
+    "timeseries",
+    "heatmap",
+    "trace",
+    "resources",
+    "pods",
+)
 
 
 class ConfigError(ValueError):
@@ -53,6 +63,20 @@ class Work:
 
 
 @dataclass(frozen=True)
+class StackGroup:
+    label: str  # "" for an ungrouped (flat list) stack
+    items: tuple[str, ...]
+
+    @property
+    def key(self) -> str:
+        """camelCase identifier for the YAML manifest, e.g. "ML frameworks" -> mlFrameworks."""
+        words = "".join(c if c.isalnum() else " " for c in self.label).split()
+        if not words:
+            return "stack"
+        return words[0].lower() + "".join(w[:1].upper() + w[1:] for w in words[1:])
+
+
+@dataclass(frozen=True)
 class Profile:
     login: str
     handle: str
@@ -62,7 +86,7 @@ class Profile:
     region: str
     timezone: str
     focus: tuple[str, ...]
-    stack: tuple[str, ...]
+    stack: tuple[StackGroup, ...]
     links: tuple[tuple[str, str], ...]
     kind: str = "Engineer"
     work: Work | None = None
@@ -114,11 +138,26 @@ def parse_profile(raw: object) -> Profile:
         region=raw["region"].strip(),
         timezone=raw["timezone"].strip(),
         focus=_str_list(raw, "focus"),
-        stack=_str_list(raw, "stack"),
+        stack=_stack(raw.get("stack")),
         links=tuple(links.items()),
         kind=_kind(raw.get("kind", "Engineer")),
         work=_work(raw.get("work")),
     )
+
+
+def _stack(raw: object) -> tuple[StackGroup, ...]:
+    """Either a flat list of tools or a mapping of group label -> list of tools."""
+    if raw is None:
+        return ()
+    if isinstance(raw, list):
+        return (StackGroup("", _str_list({"stack": raw}, "stack")),)
+    if not isinstance(raw, dict):
+        raise ConfigError("profile.stack must be a list or a mapping of group -> list")
+    groups = []
+    for label, items in raw.items():
+        name = _text("stack group", label)
+        groups.append(StackGroup(name, _str_list({f"stack.{name}": items}, f"stack.{name}")))
+    return tuple(groups)
 
 
 def _kind(value: object) -> str:

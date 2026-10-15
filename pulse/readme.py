@@ -61,7 +61,7 @@ def manifest(profile: Profile, snapshot: Snapshot) -> str:
         *_work_manifest(profile),
         "  focus:",
         *(f"    - {item}" for item in profile.focus),
-        f"  stack: [{', '.join(profile.stack)}]",
+        *_stack_manifest(profile),
         "status:",
         f"  phase: Running  # since {snapshot.created_at:%Y-%m-%d}",
         f"  observedLanguages: [{', '.join(langs)}]  # live, recency-weighted",
@@ -72,6 +72,15 @@ def manifest(profile: Profile, snapshot: Snapshot) -> str:
         )
     lines.append("```")
     return "\n".join(lines)
+
+
+def _stack_manifest(profile: Profile) -> list[str]:
+    groups = profile.stack
+    if not groups:
+        return []
+    if len(groups) == 1 and not groups[0].label:
+        return [f"  stack: [{', '.join(groups[0].items)}]"]
+    return ["  stack:", *(f"    {g.key}: [{', '.join(g.items)}]" for g in groups)]
 
 
 def _work_manifest(profile: Profile) -> list[str]:

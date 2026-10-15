@@ -79,7 +79,7 @@ def _args(ws: Path) -> list[str]:
 def test_cli_renders_all_assets_and_readme(workspace):
     assert cli.main([*_args(workspace), "--save-snapshot", str(workspace / "out.json")]) == 0
     files = sorted(p.name for p in (workspace / "assets").iterdir())
-    assert len(files) == 16
+    assert len(files) == 18
     assert "status-dark.svg" in files and "pods-light.svg" in files
     assert "apiVersion: human.dev/v1" in (workspace / "README.md").read_text(encoding="utf-8")
     assert json.loads((workspace / "out.json").read_text())["login"] == "octo"
@@ -160,3 +160,14 @@ def test_work_banner_and_manifest_escape_and_render(snapshot):
 
 def test_work_banner_empty_without_work(profile):
     assert readme.work_banner(profile) == ""
+
+
+def test_manifest_renders_grouped_stack(snapshot, profile):
+    from conftest import PROFILE_RAW
+
+    from pulse.config import parse_profile
+
+    grouped = parse_profile({**PROFILE_RAW, "stack": {"MLOps": ["Kubeflow", "MLflow"]}})
+    text = readme.manifest(grouped, snapshot)
+    assert "  stack:\n    mlops: [Kubeflow, MLflow]" in text
+    assert "  stack: [Go, Python]" in readme.manifest(profile, snapshot)

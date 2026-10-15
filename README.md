@@ -30,16 +30,27 @@ spec:
     - NirikshaAI: AI-native observability for LLMs, agents, RAG and Kubernetes
   focus:
     - Machine learning & LLM systems (agents, RAG, evaluation)
+    - MLOps on Kubernetes with Kubeflow Pipelines, MLflow, KServe and Seldon
+    - LLM serving and inference with vLLM, TGI and Ollama
     - LLM observability & AI security (prompt-injection, PII) at NirikshaAI
-    - MLOps on Kubernetes (GPU workloads, model serving, Helm)
     - OpenTelemetry SDKs & tracing (Go, Python, Node, Java)
-  stack: [Python, Go, TypeScript, Java, LLMs, RAG, MLOps, Kubernetes, Helm, OpenTelemetry, FastAPI]
+  stack:
+    languagesAPIs: [Python, Go, TypeScript, Java, FastAPI]
+    mlFrameworks: [PyTorch, TensorFlow, Keras, scikit-learn, XGBoost, Hugging Face Transformers]
+    mlops: [Kubeflow, MLflow, KServe, Seldon, Ray, Airflow, Feast, DVC]
+    llmGenAI: [LangChain, LlamaIndex, vLLM, TGI, Ollama, RAG, Vector DBs, OpenAI API, Anthropic API, AWS Bedrock]
+    cloudPlatform: [Kubernetes, Helm, Docker, Argo CD, GitOps, Terraform, AWS, GCP, Azure]
+    observability: [OpenTelemetry, Prometheus, Grafana]
 status:
   phase: Running  # since 2018-10-18
   observedLanguages: [Go, TypeScript, JavaScript, Shell]  # live, recency-weighted
   recentlyShipped: [niriksha-sdk-go, niriksha-sdk-node, niriksha-sdk-java, niriksha-sdk-python]  # public, last 30d
 ```
 <!-- /pulse:manifest -->
+
+<p align="center">
+<picture><source media="(prefers-color-scheme: dark)" srcset="assets/toolchain-dark.svg"><img src="assets/toolchain-light.svg" alt="Toolchain: languages, ML, MLOps, LLM, infrastructure and observability tools" width="100%"></picture>
+</p>
 
 <p align="center">
 <picture><source media="(prefers-color-scheme: dark)" srcset="assets/slo-dark.svg"><img src="assets/slo-light.svg" alt="SLO gauges: availability, throughput, MTTR" width="100%"></picture>

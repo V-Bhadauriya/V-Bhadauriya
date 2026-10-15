@@ -21,22 +21,18 @@ work:
 
 focus:
   - Machine learning & LLM systems (agents, RAG, evaluation)
+  - MLOps on Kubernetes with Kubeflow Pipelines, MLflow, KServe and Seldon
+  - LLM serving and inference with vLLM, TGI and Ollama
   - LLM observability & AI security (prompt-injection, PII) at NirikshaAI
-  - MLOps on Kubernetes (GPU workloads, model serving, Helm)
   - OpenTelemetry SDKs & tracing (Go, Python, Node, Java)
 
 stack:
-  - Python
-  - Go
-  - TypeScript
-  - Java
-  - LLMs
-  - RAG
-  - MLOps
-  - Kubernetes
-  - Helm
-  - OpenTelemetry
-  - FastAPI
+  Languages & APIs: [Python, Go, TypeScript, Java, FastAPI]
+  ML frameworks: [PyTorch, TensorFlow, Keras, scikit-learn, XGBoost, Hugging Face Transformers]
+  MLOps: [Kubeflow, MLflow, KServe, Seldon, Ray, Airflow, Feast, DVC]
+  LLM & GenAI: [LangChain, LlamaIndex, vLLM, TGI, Ollama, RAG, Vector DBs, OpenAI API, Anthropic API, AWS Bedrock]
+  Cloud & platform: [Kubernetes, Helm, Docker, Argo CD, GitOps, Terraform, AWS, GCP, Azure]
+  Observability: [OpenTelemetry, Prometheus, Grafana]
 
 links:
   niriksha.ai: https://niriksha.ai/

@@ -4,7 +4,17 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from pulse.render import activity, heatmap, pods, resources, slo, status, timeseries, trace
+from pulse.render import (
+    activity,
+    heatmap,
+    pods,
+    resources,
+    slo,
+    status,
+    timeseries,
+    toolchain,
+    trace,
+)
 from pulse.render.context import RenderContext
 from pulse.render.svg import Markup
 
@@ -13,6 +23,7 @@ Renderer = Callable[[RenderContext], Markup]
 PANELS: dict[str, Renderer] = {
     "status": status.render,
     "activity": activity.render,
+    "toolchain": toolchain.render,
     "slo": slo.render,
     "timeseries": timeseries.render,
     "heatmap": heatmap.render,

@@ -12,7 +12,7 @@ from pulse.privacy import PRIVATE_PREFIX, alias, build_alias_map, is_anonymised
 
 def test_parse_profile_valid(profile):
     assert profile.login == "octo"
-    assert profile.stack == ("Go", "Python")
+    assert profile.stack[0].items == ("Go", "Python")
     assert profile.links == (("github", "https://github.com/octo"),)
     assert profile.tz.key == "America/Los_Angeles"
 
@@ -79,3 +79,17 @@ def test_alias_never_leaks_unknown_private_name():
     assert alias("octo/public", False, {}) == "octo/public"
     assert is_anonymised(f"{PRIVATE_PREFIX}07")
     assert not is_anonymised("octo/public")
+
+
+def test_stack_accepts_flat_list_or_groups():
+    flat = parse_profile({**PROFILE_RAW, "stack": ["Go", "Python"]})
+    assert len(flat.stack) == 1 and flat.stack[0].label == ""
+    grouped = parse_profile(
+        {**PROFILE_RAW, "stack": {"ML frameworks": ["PyTorch"], "LLM & GenAI": ["vLLM"]}}
+    )
+    assert [g.key for g in grouped.stack] == ["mlFrameworks", "llmGenAI"]
+    assert grouped.stack[0].items == ("PyTorch",)
+    with pytest.raises(ConfigError, match="stack"):
+        parse_profile({**PROFILE_RAW, "stack": {"ML": "PyTorch"}})
+    with pytest.raises(ConfigError, match="stack"):
+        parse_profile({**PROFILE_RAW, "stack": 42})
