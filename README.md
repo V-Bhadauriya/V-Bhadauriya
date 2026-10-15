@@ -21,8 +21,7 @@ spec:
   stack: [Go, Python, TypeScript, Java, Kubernetes, Helm, OpenTelemetry, FastAPI]
 status:
   phase: Running  # since 2018-10-18
-  observedLanguages: [TypeScript, Go, JavaScript, Python]  # live, recency-weighted
-  recentlyShipped: [niriksha-sdk-go, niriksha-sdk-node, niriksha-sdk-java, niriksha-sdk-python]  # public, last 30d
+  observedLanguages: [Go, JavaScript, Python, Svelte]  # live, recency-weighted
 ```
 <!-- /pulse:manifest -->
 
