@@ -289,3 +289,53 @@ def humanize_age(delta: timedelta) -> str:
         if seconds >= size:
             return f"{seconds // size}{unit}"
     return f"{seconds}s"
+
+
+# --------------------------------------------------------------------------- yearly totals
+
+
+@dataclass(frozen=True)
+class Totals:
+    commits: int
+    prs_opened: int
+    prs_merged: int
+    additions: int
+    deletions: int
+    repos: int
+    active_days: int
+    busiest_day: tuple[date, int] | None
+
+
+def activity_totals(snapshot: Snapshot) -> Totals:
+    """Headline counts for the lookback window (commits, PRs, line churn, reach)."""
+    days = daily_activity(snapshot)
+    busiest = max(days, key=lambda d: d[1]) if days else None
+    touched = {c.repo for c in snapshot.commits} | {p.repo for p in snapshot.pull_requests}
+    return Totals(
+        commits=len(snapshot.commits),
+        prs_opened=len(snapshot.pull_requests),
+        prs_merged=sum(1 for p in snapshot.pull_requests if p.merged_at is not None),
+        additions=sum(c.additions for c in snapshot.commits),
+        deletions=sum(c.deletions for c in snapshot.commits),
+        repos=len(touched),
+        active_days=sum(1 for _, c in days if c),
+        busiest_day=busiest if busiest and busiest[1] else None,
+    )
+
+
+def calendar_weeks(snapshot: Snapshot) -> tuple[tuple[tuple[date, int] | None, ...], ...]:
+    """Daily activity laid out as Monday-first week columns (None pads the edges)."""
+    days = daily_activity(snapshot)
+    if not days:
+        return ()
+    lead = days[0][0].weekday()
+    padded: list[tuple[date, int] | None] = [*([None] * lead), *days]
+    padded = [*padded, *([None] * (-len(padded) % 7))]
+    return tuple(tuple(padded[i : i + 7]) for i in range(0, len(padded), 7))
+
+
+def compact_number(value: int) -> str:
+    for suffix, size in (("M", 1_000_000), ("k", 1_000)):
+        if abs(value) >= size:
+            return f"{value / size:.1f}".rstrip("0").rstrip(".") + suffix
+    return f"{value:,}"

@@ -18,14 +18,17 @@ MAX_PAGES = 50
 
 LOOKBACK_DAYS = 365
 TRACE_WINDOW_DAYS = 14
-MAX_COMMITS_PER_REPO = 500
+MAX_COMMITS_PER_REPO = 2000
 MAX_PULL_REQUESTS = 1000
 REPO_BATCH_SIZE = 8
+# Commit history with line stats is expensive server-side; small batches avoid 502 timeouts.
+HISTORY_BATCH_SIZE = 2
+HISTORY_PAGE_SIZE = 50
 
 PRIVATE_LABEL = "private-workload"
 MAX_SVG_BYTES = 100_000
 
-ASSET_NAMES = ("status", "slo", "timeseries", "heatmap", "trace", "resources", "pods")
+ASSET_NAMES = ("status", "activity", "slo", "timeseries", "heatmap", "trace", "resources", "pods")
 
 
 class ConfigError(ValueError):

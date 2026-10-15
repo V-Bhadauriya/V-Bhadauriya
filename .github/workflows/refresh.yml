@@ -77,7 +77,7 @@ jobs:
             echo "No changes to commit."
             exit 0
           fi
-          allowed='^(README\.md|assets/(status|slo|timeseries|heatmap|trace|resources|pods)-(dark|light)\.svg)$'
+          allowed='^(README\.md|assets/(status|activity|slo|timeseries|heatmap|trace|resources|pods)-(dark|light)\.svg)$'
           if git diff --cached --name-only | grep -Ev "$allowed"; then
             echo "::error::Unexpected file staged; refusing to commit."
             exit 1

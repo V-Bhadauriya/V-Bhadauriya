@@ -140,9 +140,13 @@ USER = {
     "name": "Octo",
     "createdAt": "2018-10-18T00:00:00Z",
     "contributionsCollection": {
+        "commitContributionsByRepository": [
+            {"repository": {"nameWithOwner": "octo/api"}},
+            {"repository": {"nameWithOwner": "teamorg/platform"}},
+        ],
         "contributionCalendar": {
             "weeks": [{"contributionDays": [{"date": "2026-10-14", "contributionCount": 3}]}]
-        }
+        },
     },
 }
 
@@ -219,6 +223,14 @@ def _fake_github(request: httpx.Request) -> httpx.Response:
     if query.startswith("query PullRequests"):
         page = {"pageInfo": {"hasNextPage": False}, "nodes": PRS}
         return httpx.Response(200, json={"data": {"user": {"pullRequests": page}}})
+    if query.startswith("query RepoDetails"):
+        data = {}
+        for i in range(10):
+            if f"n{i}" not in variables:
+                break
+            name = f"{variables[f'o{i}']}/{variables[f'n{i}']}"
+            data[f"r{i}"] = {**REPOS[0], "nameWithOwner": name, "isPrivate": True}
+        return httpx.Response(200, json={"data": data})
     if query.startswith("query History"):
         data = {}
         for i in range(10):
@@ -236,17 +248,19 @@ def test_fetch_snapshot_end_to_end_anonymises_private_repos(client):
     respx.post(URL).mock(side_effect=_fake_github)
     result = fetch_snapshot(client, "octo", NOW)
     snap = result.snapshot
-    assert result.private_names == frozenset({"secretcorp/top-secret"})
 
     assert snap.login == "octo"
-    assert len(snap.repos) == 3
-    # two active repos x two history pages
-    assert len(snap.commits) == 4
+    # 3 listed + 1 org repo reached only via contributions (team membership)
+    assert len(snap.repos) == 4
+    assert result.private_names == frozenset({"secretcorp/top-secret", "teamorg/platform"})
+    # three active repos x two history pages
+    assert len(snap.commits) == 6
     # PR older than the lookback window is dropped
     assert len(snap.pull_requests) == 1
-    assert snap.meta == {"private_repos": 1, "unreadable_repos": 0}
+    assert snap.meta == {"private_repos": 2, "unreadable_repos": 0}
     dumped = json.dumps(snap.to_dict())
     assert "secretcorp" not in dumped and "top-secret" not in dumped
+    assert "teamorg" not in dumped
     assert snap.repos[0].languages[0].color == "#8b949e"
 
 

@@ -5,6 +5,11 @@ query User($login: String!, $from: DateTime!, $to: DateTime!) {
     name
     createdAt
     contributionsCollection(from: $from, to: $to) {
+      commitContributionsByRepository(maxRepositories: 100) {
+        repository {
+          nameWithOwner
+        }
+      }
       contributionCalendar {
         weeks {
           contributionDays {

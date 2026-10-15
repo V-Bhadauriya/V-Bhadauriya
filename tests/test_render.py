@@ -6,7 +6,7 @@ import pytest
 from conftest import PROFILE_RAW, empty_snapshot
 
 from pulse.config import MAX_SVG_BYTES, parse_profile
-from pulse.render import PANELS, heatmap, pods, resources, slo, status, timeseries
+from pulse.render import PANELS, activity, heatmap, pods, resources, slo, status, timeseries
 from pulse.render.context import RenderContext
 from pulse.render.svg import Markup, el, truncate
 from pulse.render.theme import DARK, LIGHT, THEMES, status_color
@@ -106,3 +106,17 @@ def test_no_private_alias_owner_leaks_into_assets(snapshot, profile):
         for renderer in PANELS.values():
             svg = str(renderer(RenderContext(snapshot, profile, theme)))
             assert "private/workload" not in svg
+
+
+def test_activity_counters(snapshot):
+    from pulse import metrics
+
+    cells = activity.counter_cells(metrics.activity_totals(snapshot))
+    labels = [c[0] for c in cells]
+    assert labels == ["COMMITS", "PRS OPENED", "PRS MERGED", "LINES", "REPOS", "ACTIVE DAYS"]
+    assert dict((c[0], c[1]) for c in cells)["LINES"] == "+65 −13"
+
+
+def test_timeseries_scale_ceiling():
+    assert timeseries._nice_ceiling(511) == 600
+    assert timeseries._nice_ceiling(2500) == 3000

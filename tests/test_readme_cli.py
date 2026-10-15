@@ -78,7 +78,7 @@ def _args(ws: Path) -> list[str]:
 def test_cli_renders_all_assets_and_readme(workspace):
     assert cli.main([*_args(workspace), "--save-snapshot", str(workspace / "out.json")]) == 0
     files = sorted(p.name for p in (workspace / "assets").iterdir())
-    assert len(files) == 14
+    assert len(files) == 16
     assert "status-dark.svg" in files and "pods-light.svg" in files
     assert "kind: Engineer" in (workspace / "README.md").read_text(encoding="utf-8")
     assert json.loads((workspace / "out.json").read_text())["login"] == "octo"

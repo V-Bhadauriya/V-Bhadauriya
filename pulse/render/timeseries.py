@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 from pulse import metrics
 from pulse.render.context import RenderContext
 from pulse.render.svg import Markup, circle, document, el, group, line, path, text
@@ -77,10 +79,10 @@ def render(ctx: RenderContext) -> Markup:
 
 
 def _nice_ceiling(value: float) -> float:
-    for base in (5, 10, 20, 25, 50, 100, 200, 250, 500, 1000):
+    for base in (5, 10, 20, 25, 50, 100, 150, 200, 250, 300, 400, 500, 600, 750, 1000, 1500, 2000):
         if value <= base:
             return float(base)
-    return float(value)
+    return float(math.ceil(value / 1000) * 1000)
 
 
 def _grid(scale_max: float, y) -> Markup:

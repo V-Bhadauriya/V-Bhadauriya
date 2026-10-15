@@ -127,3 +127,29 @@ def test_humanize_age():
     assert metrics.humanize_age(timedelta(hours=5)) == "5h"
     assert metrics.humanize_age(timedelta(minutes=7)) == "7m"
     assert metrics.humanize_age(timedelta(seconds=-5)) == "0s"
+
+
+def test_activity_totals(snapshot):
+    totals = metrics.activity_totals(snapshot)
+    assert totals.commits == 7
+    assert totals.prs_opened == 4
+    assert totals.prs_merged == 2
+    assert (totals.additions, totals.deletions) == (65, 13)
+    assert totals.repos == 3  # api, sdk, private workload
+    assert 0 < totals.active_days <= 365
+    assert totals.busiest_day is not None
+    assert metrics.activity_totals(empty_snapshot()).busiest_day is None
+
+
+def test_calendar_weeks_are_monday_first_and_padded(snapshot):
+    weeks = metrics.calendar_weeks(snapshot)
+    assert all(len(w) == 7 for w in weeks)
+    days = [d for w in weeks for d in w if d]
+    assert len(days) == 365
+    assert all(d[0].weekday() == row for w in weeks for row, d in enumerate(w) if d)
+
+
+def test_compact_number():
+    assert metrics.compact_number(999) == "999"
+    assert metrics.compact_number(1_500) == "1.5k"
+    assert metrics.compact_number(2_000_000) == "2M"

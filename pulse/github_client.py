@@ -158,9 +158,52 @@ def _paginate(
     log.warning("stopped paginating %s after %d pages", query_name, config.MAX_PAGES)
 
 
+_REPO_FIELDS = (
+    "nameWithOwner isPrivate isFork createdAt pushedAt stargazerCount "
+    "languages(first: 8, orderBy: {field: SIZE, direction: DESC}) "
+    "{ edges { size node { name color } } }"
+)
+
+
+def build_repo_details_query(count: int) -> str:
+    params = ", ".join(f"$o{i}: String!, $n{i}: String!" for i in range(count))
+    body = "\n".join(
+        f"  r{i}: repository(owner: $o{i}, name: $n{i}) {{ {_REPO_FIELDS} }}" for i in range(count)
+    )
+    return f"query RepoDetails({params}) {{\n{body}\n}}"
+
+
+def fetch_repo_details(client: GitHubClient, names: list[str]) -> list[dict[str, Any]]:
+    """Metadata for repos you contribute to that the owner-affiliation listing leaves out
+    (e.g. org repos reached through team membership)."""
+    found: list[dict[str, Any]] = []
+    for start in range(0, len(names), config.REPO_BATCH_SIZE):
+        batch = names[start : start + config.REPO_BATCH_SIZE]
+        variables: dict[str, Any] = {}
+        for i, name in enumerate(batch):
+            owner, repo = name.split("/", 1)
+            variables.update({f"o{i}": owner, f"n{i}": repo})
+        data = client.query(build_repo_details_query(len(batch)), variables)
+        found = [*found, *(data[f"r{i}"] for i in range(len(batch)) if data.get(f"r{i}"))]
+    return found
+
+
+def contributed_repo_names(user: dict[str, Any], pr_nodes: list[dict[str, Any]]) -> list[str]:
+    """Every repo with your commits or PRs in the window, in first-seen order."""
+    by_commits = [
+        (entry.get("repository") or {}).get("nameWithOwner")
+        for entry in (user.get("contributionsCollection") or {}).get(
+            "commitContributionsByRepository"
+        )
+        or []
+    ]
+    by_prs = [p["repository"]["nameWithOwner"] for p in pr_nodes]
+    return list(dict.fromkeys(name for name in [*by_commits, *by_prs] if name))
+
+
 _HISTORY_SELECTION = (
     "defaultBranchRef { target { ... on Commit { "
-    "history(first: 100, after: $c%(i)d, since: $since, author: {id: $author}) { "
+    "history(first: %(page)d, after: $c%(i)d, since: $since, author: {id: $author}) { "
     "pageInfo { hasNextPage endCursor } nodes { committedDate additions deletions } "
     "} } } }"
 )
@@ -169,9 +212,12 @@ _HISTORY_SELECTION = (
 def build_history_query(count: int) -> str:
     """Aliased history query for `count` repos; owner/name/cursor are passed as variables."""
     params = ", ".join(f"$o{i}: String!, $n{i}: String!, $c{i}: String" for i in range(count))
+    selections = (
+        _HISTORY_SELECTION % {"i": i, "page": config.HISTORY_PAGE_SIZE} for i in range(count)
+    )
     body = "\n".join(
-        f"  r{i}: repository(owner: $o{i}, name: $n{i}) {{ {_HISTORY_SELECTION % {'i': i}} }}"
-        for i in range(count)
+        f"  r{i}: repository(owner: $o{i}, name: $n{i}) {{ {sel} }}"
+        for i, sel in enumerate(selections)
     )
     return f"query History($author: ID!, $since: GitTimestamp!, {params}) {{\n{body}\n}}"
 
@@ -184,7 +230,8 @@ def fetch_commits(
     unreadable: set[str] = set()
     pending: list[tuple[str, str | None]] = [(name, None) for name in repo_names]
     while pending:
-        batch, pending = pending[: config.REPO_BATCH_SIZE], pending[config.REPO_BATCH_SIZE :]
+        size = config.HISTORY_BATCH_SIZE
+        batch, pending = pending[:size], pending[size:]
         variables: dict[str, Any] = {"author": author_id, "since": since.isoformat()}
         for i, (name, cursor) in enumerate(batch):
             owner, repo = name.split("/", 1)
@@ -222,8 +269,12 @@ class FetchResult:
 def fetch_snapshot(client: GitHubClient, login: str, now: datetime) -> FetchResult:
     since = now - timedelta(days=config.LOOKBACK_DAYS)
     user = fetch_user(client, login, now)
-    repo_nodes = fetch_repos(client, login)
+    listed = fetch_repos(client, login)
     pr_nodes = fetch_pull_requests(client, login, since)
+
+    known = {r["nameWithOwner"] for r in listed}
+    extra = [n for n in contributed_repo_names(user, pr_nodes) if n not in known]
+    repo_nodes = [*listed, *fetch_repo_details(client, extra)]
 
     active = [r["nameWithOwner"] for r in repo_nodes if _parse_dt(r["pushedAt"]) >= since]
     commit_nodes, unreadable = fetch_commits(client, user["id"], active, since)

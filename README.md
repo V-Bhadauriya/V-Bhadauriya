@@ -3,6 +3,10 @@
 <picture><source media="(prefers-color-scheme: dark)" srcset="assets/status-dark.svg"><img src="assets/status-light.svg" alt="Live status banner" width="100%"></picture>
 </p>
 
+<p align="center">
+<picture><source media="(prefers-color-scheme: dark)" srcset="assets/activity-dark.svg"><img src="assets/activity-light.svg" alt="Commits, pull requests and daily activity over the last 365 days" width="100%"></picture>
+</p>
+
 <!-- pulse:manifest -->
 ```yaml
 apiVersion: human.dev/v1
@@ -21,7 +25,12 @@ spec:
   stack: [Go, Python, TypeScript, Java, Kubernetes, Helm, OpenTelemetry, FastAPI]
 status:
   phase: Running  # since 2018-10-18
+<<<<<<< Updated upstream
   observedLanguages: [TypeScript, Go, JavaScript, HTML]  # live, recency-weighted
+=======
+  observedLanguages: [Go, TypeScript, JavaScript, Shell]  # live, recency-weighted
+  recentlyShipped: [niriksha-sdk-go, niriksha-sdk-node, niriksha-sdk-java, niriksha-sdk-python]  # public, last 30d
+>>>>>>> Stashed changes
 ```
 <!-- /pulse:manifest -->
 
