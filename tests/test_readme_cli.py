@@ -108,3 +108,14 @@ def test_leak_check_blocks_private_names_without_echoing_them():
         cli.check_for_leaks({"a.svg": "<svg>Acme/Secret</svg>"}, frozenset({"acme/secret"}))
     assert "acme/secret" not in str(info.value).lower()
     cli.check_for_leaks({"a.svg": "<svg>fine</svg>"}, frozenset({"acme/secret"}))
+
+
+def test_cli_keeps_existing_panels_when_token_was_denied(workspace, snapshot):
+    from dataclasses import replace
+
+    denied = replace(snapshot, meta={**snapshot.meta, "denied": 3})
+    (workspace / "snap.json").write_text(json.dumps(denied.to_dict()), encoding="utf-8")
+    assert cli.main(_args(workspace)) == 1
+    assert not (workspace / "assets").exists()
+    assert cli.main([*_args(workspace), "--allow-partial"]) == 0
+    assert (workspace / "assets").exists()

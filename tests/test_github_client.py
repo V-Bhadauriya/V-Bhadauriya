@@ -13,6 +13,7 @@ from pulse.github_client import (
     GitHubError,
     build_history_query,
     build_snapshot,
+    classify_error,
     fetch_repos,
     fetch_snapshot,
 )
@@ -44,6 +45,45 @@ def test_query_tolerates_partial_errors_without_logging_messages(client, caplog)
     assert client.query("{ ok }", {}) == {"ok": 1}
     assert "FORBIDDEN" in caplog.text
     assert "secret-x" not in caplog.text
+    assert client.denied == 1
+
+
+@pytest.mark.parametrize(
+    "error, category",
+    [
+        (
+            {
+                "type": "FORBIDDEN",
+                "message": "Resource protected by organization SAML enforcement. "
+                "You must grant your Personal Access token access to acme.",
+            },
+            "SSO_NOT_AUTHORIZED",
+        ),
+        (
+            {
+                "type": "FORBIDDEN",
+                "message": "`acme` forbids access via a personal access tokens "
+                "(classic). Please use a GitHub App...",
+            },
+            "CLASSIC_TOKEN_BLOCKED_BY_ORG",
+        ),
+        (
+            {
+                "type": "FORBIDDEN",
+                "message": "Although you appear to have the correct authorization "
+                "credentials, the `acme` organization has enabled OAuth App access restrictions",
+            },
+            "OAUTH_APP_RESTRICTED",
+        ),
+        ({"type": "NOT_FOUND", "message": "Could not resolve acme/x"}, "NOT_FOUND"),
+        ({"type": "<b>weird</b>", "message": ""}, "UNKNOWN"),
+        ({}, "UNKNOWN"),
+    ],
+)
+def test_classify_error_is_name_free(error, category):
+    result = classify_error(error)
+    assert result == category
+    assert "acme" not in result.lower()
 
 
 @respx.mock
@@ -257,7 +297,7 @@ def test_fetch_snapshot_end_to_end_anonymises_private_repos(client):
     assert len(snap.commits) == 6
     # PR older than the lookback window is dropped
     assert len(snap.pull_requests) == 1
-    assert snap.meta == {"private_repos": 2, "unreadable_repos": 0}
+    assert snap.meta == {"private_repos": 2, "unreadable_repos": 0, "denied": 0}
     dumped = json.dumps(snap.to_dict())
     assert "secretcorp" not in dumped and "top-secret" not in dumped
     assert "teamorg" not in dumped
@@ -288,9 +328,11 @@ def test_unreadable_repos_are_counted(client):
     def handler(request):
         body = json.loads(request.content)
         if body["query"].startswith("query History"):
-            return httpx.Response(200, json={"data": {"r0": None}, "errors": [{"type": "X"}]})
+            errors = [{"type": "FORBIDDEN", "message": "SAML enforcement"}]
+            return httpx.Response(200, json={"data": {"r0": None}, "errors": errors})
         return _fake_github(request)
 
     respx.post(URL).mock(side_effect=handler)
     result = fetch_snapshot(client, "octo", NOW)
     assert result.snapshot.meta["unreadable_repos"] >= 1
+    assert result.snapshot.meta["denied"] >= 1

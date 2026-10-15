@@ -48,6 +48,12 @@ class GitHubClient:
             "User-Agent": config.USER_AGENT,
         }
         self._sleep = sleep
+        self._denied = 0
+
+    @property
+    def denied(self) -> int:
+        """How many resources GitHub refused to return to this token so far."""
+        return self._denied
 
     def query(self, query: str, variables: dict[str, Any]) -> dict[str, Any]:
         payload = {"query": query, "variables": variables}
@@ -74,14 +80,15 @@ class GitHubClient:
                 self._sleep(delay)
         raise GitHubError(f"GitHub API failed after {config.MAX_RETRIES} attempts: {last_error}")
 
-    @staticmethod
-    def _unwrap(body: dict[str, Any]) -> dict[str, Any]:
+    def _unwrap(self, body: dict[str, Any]) -> dict[str, Any]:
         errors = body.get("errors") or []
         data = body.get("data")
         if errors:
-            # Only error *types* are reported: GitHub's messages can name private repos/orgs,
+            # Only fixed categories are reported: GitHub's messages can name private repos/orgs,
             # and Actions logs on a public profile repo are world-readable.
-            kinds = ", ".join(sorted({str(e.get("type", "UNKNOWN")) for e in errors}))
+            categories = [classify_error(e) for e in errors]
+            self._denied += sum(1 for c in categories if c in _ACCESS_DENIED)
+            kinds = ", ".join(sorted(set(categories)))
             if not data:
                 raise GitHubError(f"GraphQL error ({len(errors)}x: {kinds})")
             # Partial data (e.g. an org blocks token access to one repo) is still useful.
@@ -89,6 +96,26 @@ class GitHubClient:
         if data is None:
             raise GitHubError("GraphQL response contained no data")
         return data
+
+
+_ERROR_CATEGORIES = (
+    ("saml", "SSO_NOT_AUTHORIZED"),
+    ("personal access tokens (classic)", "CLASSIC_TOKEN_BLOCKED_BY_ORG"),
+    ("fine-grained", "FINE_GRAINED_TOKEN_POLICY"),
+    ("oauth app access restrictions", "OAUTH_APP_RESTRICTED"),
+    ("ip allow list", "IP_ALLOW_LIST"),
+)
+_ACCESS_DENIED = {category for _, category in _ERROR_CATEGORIES} | {"FORBIDDEN"}
+
+
+def classify_error(error: dict[str, Any]) -> str:
+    """Map a GraphQL error to a fixed, name-free category that is safe to log publicly."""
+    message = str(error.get("message", "")).lower()
+    for needle, category in _ERROR_CATEGORIES:
+        if needle in message:
+            return category
+    kind = str(error.get("type", "UNKNOWN")).upper()
+    return kind if kind.replace("_", "").isalpha() else "UNKNOWN"
 
 
 def _rate_limit_wait(response: httpx.Response) -> float | None:
@@ -284,7 +311,7 @@ def fetch_snapshot(client: GitHubClient, login: str, now: datetime) -> FetchResu
         [r["nameWithOwner"] for r in repo_nodes if r["isPrivate"]]
         + [p["repository"]["nameWithOwner"] for p in pr_nodes if p["repository"]["isPrivate"]]
     )
-    meta = {**snapshot.meta, "unreadable_repos": unreadable}
+    meta = {**snapshot.meta, "unreadable_repos": unreadable, "denied": client.denied}
     return FetchResult(replace(snapshot, meta=meta), private_names)
 
 

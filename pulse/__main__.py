@@ -26,6 +26,10 @@ class RenderError(RuntimeError):
     """Raised when a rendered asset fails validation."""
 
 
+class PartialDataError(RuntimeError):
+    """Raised when the token was refused data, so publishing would understate activity."""
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="pulse", description=__doc__)
     parser.add_argument("--profile", type=Path, default=Path("profile.yml"))
@@ -33,6 +37,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--readme", type=Path, default=Path("README.md"))
     parser.add_argument("--fixture", type=Path, help="render from a saved snapshot, no API calls")
     parser.add_argument("--save-snapshot", type=Path, help="write the fetched snapshot as JSON")
+    parser.add_argument(
+        "--allow-partial",
+        action="store_true",
+        help="publish even if GitHub refused some data to the token",
+    )
     return parser.parse_args(argv)
 
 
@@ -108,8 +117,21 @@ def main(argv: list[str] | None = None) -> int:
         if args.save_snapshot:
             payload = json.dumps(fetched.snapshot.to_dict(), indent=1)
             args.save_snapshot.write_text(payload, "utf-8")
+        denied = int(fetched.snapshot.meta.get("denied", 0))
+        if denied and not args.allow_partial:
+            raise PartialDataError(
+                f"GitHub refused {denied} resources to this token (see warnings above for the "
+                "reason); keeping the existing panels. Fix the token or pass --allow-partial."
+            )
         write_outputs(args, profile, fetched)
-    except (ConfigError, GitHubError, RenderError, readme.MarkerError, OSError) as exc:
+    except (
+        ConfigError,
+        GitHubError,
+        RenderError,
+        PartialDataError,
+        readme.MarkerError,
+        OSError,
+    ) as exc:
         log.error("%s", exc)
         return 1
     return 0
