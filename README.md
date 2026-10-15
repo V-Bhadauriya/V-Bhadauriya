@@ -21,7 +21,7 @@ spec:
   stack: [Go, Python, TypeScript, Java, Kubernetes, Helm, OpenTelemetry, FastAPI]
 status:
   phase: Running  # since 2018-10-18
-  observedLanguages: [Go, JavaScript, Python, Svelte]  # live, recency-weighted
+  observedLanguages: [TypeScript, Go, JavaScript, HTML]  # live, recency-weighted
 ```
 <!-- /pulse:manifest -->
 
