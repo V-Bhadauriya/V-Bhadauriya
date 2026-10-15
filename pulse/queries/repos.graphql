@@ -1,0 +1,32 @@
+query Repos($login: String!, $cursor: String) {
+  user(login: $login) {
+    repositories(
+      first: 50
+      after: $cursor
+      ownerAffiliations: [OWNER, COLLABORATOR, ORGANIZATION_MEMBER]
+      orderBy: { field: PUSHED_AT, direction: DESC }
+    ) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
+        nameWithOwner
+        isPrivate
+        isFork
+        createdAt
+        pushedAt
+        stargazerCount
+        languages(first: 8, orderBy: { field: SIZE, direction: DESC }) {
+          edges {
+            size
+            node {
+              name
+              color
+            }
+          }
+        }
+      }
+    }
+  }
+}

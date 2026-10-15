@@ -1,0 +1,22 @@
+query User($login: String!, $from: DateTime!, $to: DateTime!) {
+  user(login: $login) {
+    id
+    login
+    name
+    createdAt
+    contributionsCollection(from: $from, to: $to) {
+      contributionCalendar {
+        weeks {
+          contributionDays {
+            date
+            contributionCount
+          }
+        }
+      }
+    }
+  }
+  rateLimit {
+    remaining
+    resetAt
+  }
+}

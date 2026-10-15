@@ -1,0 +1,19 @@
+query PullRequests($login: String!, $cursor: String) {
+  user(login: $login) {
+    pullRequests(first: 100, after: $cursor, orderBy: { field: CREATED_AT, direction: DESC }) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
+        createdAt
+        mergedAt
+        state
+        repository {
+          nameWithOwner
+          isPrivate
+        }
+      }
+    }
+  }
+}

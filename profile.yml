@@ -1,0 +1,28 @@
+# Editable profile content for the Pulse generator.
+# Live metrics come from the GitHub API; everything here is hand-written.
+
+login: V-Bhadauriya
+handle: vivek.bhadauriya
+display_name: Vivek Singh Bhadauriya
+tagline: platform engineer · observability · k8s · OTel
+role: platform-engineer
+region: us-west (Fremont, CA)
+timezone: America/Los_Angeles
+
+focus:
+  - OpenTelemetry instrumentation & SDKs
+  - Kubernetes platform engineering
+  - Cloud-native APIs in Go and Python
+
+stack:
+  - Go
+  - Python
+  - TypeScript
+  - Java
+  - Kubernetes
+  - Helm
+  - OpenTelemetry
+  - FastAPI
+
+links:
+  github: https://github.com/V-Bhadauriya
