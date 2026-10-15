@@ -73,7 +73,7 @@ def test_slo_helpers(snapshot, profile):
     assert slo.format_hours(72) == "3d"
     assert slo.arc_path(0, 0, 10).startswith("M")
     gauges = slo.gauges(RenderContext(snapshot, profile, DARK))
-    assert [g.label for g in gauges] == ["AVAILABILITY", "THROUGHPUT", "MTTR"]
+    assert [g.label for g in gauges] == ["AVAILABILITY", "THROUGHPUT", "MTTR", "MERGE RATE"]
     assert all(0 <= g.ratio <= 1 for g in gauges)
 
 
@@ -105,7 +105,7 @@ def test_no_private_alias_owner_leaks_into_assets(snapshot, profile):
     for theme in THEMES:
         for renderer in PANELS.values():
             svg = str(renderer(RenderContext(snapshot, profile, theme)))
-            assert "private/workload" not in svg
+            assert "workload" not in svg
 
 
 def test_activity_counters(snapshot):

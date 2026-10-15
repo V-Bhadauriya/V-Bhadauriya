@@ -5,11 +5,14 @@ from __future__ import annotations
 from pulse import metrics
 from pulse.render.context import RenderContext
 from pulse.render.svg import Markup, document, el, group, rect, text
-from pulse.render.theme import HALF_H, HALF_W, PAD, panel, stylesheet
+from pulse.render.theme import FULL_W, PAD, panel, stylesheet
 
 DAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-GRID_X, GRID_Y = 50, 50
-CELL_W, CELL_H, GAP = 13.5, 17, 2
+HEIGHT = 264
+GRID_X, GRID_Y = 50, 52
+GAP = 3
+CELL_W = (FULL_W - GRID_X - PAD) / 24 - GAP
+CELL_H = 20
 
 SWEEP_PX = 24 * (CELL_W + GAP)
 EXTRA_CSS = f"""
@@ -34,8 +37,8 @@ def render(ctx: RenderContext) -> Markup:
     grid_w = 24 * (CELL_W + GAP)
     grid_h = 7 * (CELL_H + GAP)
     return document(
-        HALF_W,
-        HALF_H,
+        FULL_W,
+        HEIGHT,
         "Activity heatmap by hour and weekday",
         stylesheet(t, EXTRA_CSS),
         el(
@@ -49,14 +52,14 @@ def render(ctx: RenderContext) -> Markup:
             ),
             el("clipPath", {"id": "gridclip"}, rect(GRID_X, GRID_Y, grid_w, grid_h)),
         ),
-        panel(t, HALF_W, HALF_H, "Latency map · hour × day", f"{total:,} events · {tz_abbr}"),
+        panel(t, FULL_W, HEIGHT, "Latency map · hour × day", f"{total:,} events · {tz_abbr}"),
         _labels(),
         _cells(ctx, matrix, peak),
         group(
-            rect(GRID_X - 30, GRID_Y, 30, grid_h, fill="url(#beam)", class_="sweep"),
+            rect(GRID_X - 60, GRID_Y, 60, grid_h, fill="url(#beam)", class_="sweep"),
             clip_path="url(#gridclip)",
         ),
-        text(PAD, HALF_H - 14, _summary(matrix), class_="sm mut"),
+        text(PAD, HEIGHT - 14, _summary(matrix), class_="sm mut"),
         _legend(ctx),
     )
 
@@ -79,7 +82,7 @@ def _labels() -> Markup:
             f"{h:02d}",
             class_="sm mut",
         )
-        for h in (0, 6, 12, 18)
+        for h in range(0, 24, 3)
     )
     return group(*days, *hours)
 
@@ -96,7 +99,7 @@ def _cells(ctx: RenderContext, matrix, peak: int) -> Markup:
                     GRID_Y + d * (CELL_H + GAP),
                     CELL_W,
                     CELL_H,
-                    rx=3,
+                    rx=4,
                     fill=t.accent if alpha else t.grid,
                     fill_opacity=f"{alpha:.2f}" if alpha else None,
                     class_="fade",
@@ -118,11 +121,11 @@ def _summary(matrix) -> str:
 
 def _legend(ctx: RenderContext) -> Markup:
     t = ctx.theme
-    x = HALF_W - PAD - 5 * 12
+    x = FULL_W - PAD - 5 * 12
     swatches = (
         rect(
             x + i * 12,
-            HALF_H - 24,
+            HEIGHT - 24,
             10,
             10,
             rx=2,
@@ -131,4 +134,4 @@ def _legend(ctx: RenderContext) -> Markup:
         )
         for i, a in enumerate((0, 0.25, 0.5, 0.75, 1.0))
     )
-    return group(text(x - 6, HALF_H - 15, "less", class_="sm mut", text_anchor="end"), *swatches)
+    return group(text(x - 6, HEIGHT - 15, "less", class_="sm mut", text_anchor="end"), *swatches)

@@ -7,9 +7,11 @@ import math
 from pulse import metrics
 from pulse.render.context import RenderContext
 from pulse.render.svg import Markup, circle, document, el, group, line, path, text
-from pulse.render.theme import HALF_H, HALF_W, PAD, panel, stylesheet
+from pulse.render.theme import FULL_W, PAD, panel, stylesheet
 
-LEFT, RIGHT, TOP, BOTTOM = 40, HALF_W - PAD, 56, HALF_H - 34
+HEIGHT = 250
+
+LEFT, RIGHT, TOP, BOTTOM = 44, FULL_W - PAD - 8, 56, HEIGHT - 34
 
 
 def smooth_path(points: list[tuple[float, float]]) -> str:
@@ -50,8 +52,8 @@ def render(ctx: RenderContext) -> Markup:
     mean = sum(counts) / len(counts) if counts else 0.0
 
     return document(
-        HALF_W,
-        HALF_H,
+        FULL_W,
+        HEIGHT,
         "Weekly activity time series",
         stylesheet(t),
         el(
@@ -64,7 +66,7 @@ def render(ctx: RenderContext) -> Markup:
                 el("stop", {"offset": "1", "stop-color": t.accent, "stop-opacity": "0"}),
             ),
         ),
-        panel(t, HALF_W, HALF_H, "Throughput · events/week", f"52w · Σ {sum(counts):,}"),
+        panel(t, FULL_W, HEIGHT, "Throughput · events/week", f"52w · Σ {sum(counts):,}"),
         _grid(scale_max, y),
         _month_labels(weeks, step),
         path(area, fill="url(#area)", class_="fade", style="animation-delay:1.2s")
@@ -99,7 +101,7 @@ def _grid(scale_max: float, y) -> Markup:
 def _month_labels(weeks, step: float) -> Markup:
     labels, last_month = [], None
     for i, week in enumerate(weeks):
-        if week.start.month != last_month and week.start.month % 3 == 1:
+        if week.start.month != last_month:
             labels.append(text(LEFT + i * step, BOTTOM + 16, f"{week.start:%b}", class_="sm mut"))
         last_month = week.start.month
     return group(*labels)

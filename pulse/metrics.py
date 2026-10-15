@@ -176,25 +176,47 @@ def heatmap(snapshot: Snapshot, tz: tzinfo) -> tuple[tuple[int, ...], ...]:
 def trace_spans(snapshot: Snapshot, max_spans: int = 7) -> tuple[Span, ...]:
     """Activity in the trace window grouped into one span per service (repo).
 
-    Private repos keep only their anonymised alias (e.g. `workload-03`).
+    Private repos are labelled by their main language only, e.g. "private · Go service".
+    The profile repo itself is left out: its commits are just the refresh bot.
     """
     window_start = snapshot.fetched_at - timedelta(days=config.TRACE_WINDOW_DAYS)
+    profile_repo = f"{snapshot.login}/{snapshot.login}".lower()
     grouped: dict[str, list[Event]] = {}
     for repo, event in _events_with_repo(snapshot):
-        if event.at >= window_start:
+        if event.at >= window_start and repo.lower() != profile_repo:
             grouped[repo] = [*grouped.get(repo, []), event]
+    busiest = sorted(grouped, key=lambda r: (-len(grouped[r]), r))[:max_spans]
+    labels = private_labels(snapshot, [r for r in busiest if is_anonymised(r)])
     spans = [
         Span(
-            service=repo.split("/")[-1],
+            service=labels.get(repo, repo.split("/")[-1]),
             is_private=is_anonymised(repo),
-            start=min(e.at for e in evs),
-            end=max(e.at for e in evs),
-            events=tuple(sorted(evs, key=_at)),
+            start=min(e.at for e in grouped[repo]),
+            end=max(e.at for e in grouped[repo]),
+            events=tuple(sorted(grouped[repo], key=_at)),
         )
-        for repo, evs in grouped.items()
+        for repo in busiest
     ]
-    spans.sort(key=lambda s: (-len(s.events), s.service))
-    return tuple(sorted(spans[:max_spans], key=lambda s: s.start))
+    return tuple(sorted(spans, key=lambda s: s.start))
+
+
+def private_labels(snapshot: Snapshot, aliases: list[str]) -> dict[str, str]:
+    """Human-readable names for private repos that reveal nothing but the main language.
+
+    Numbered only when two private repos share a language: "private · Go service 2".
+    """
+    language = {
+        r.name_with_owner: (r.languages[0].name if r.languages else "") for r in snapshot.repos
+    }
+    bases = {a: f"private · {language.get(a) or 'app'} service" for a in aliases}
+    totals = Counter(bases.values())
+    seen: Counter[str] = Counter()
+    labels = {}
+    for alias_name in aliases:
+        base = bases[alias_name]
+        seen[base] += 1
+        labels[alias_name] = base if totals[base] == 1 else f"{base} {seen[base]}"
+    return labels
 
 
 def _at(event: Event) -> datetime:

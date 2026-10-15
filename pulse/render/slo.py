@@ -1,4 +1,4 @@
-"""SLO panel: availability, throughput and MTTR gauges."""
+"""SLO panel: availability, throughput, MTTR and merge-rate gauges."""
 
 from __future__ import annotations
 
@@ -8,13 +8,14 @@ from dataclasses import dataclass
 from pulse import metrics
 from pulse.render.context import RenderContext
 from pulse.render.svg import Markup, circle, document, el, group, line, path, text
-from pulse.render.theme import HALF_H, HALF_W, panel, status_color, stylesheet
+from pulse.render.theme import FULL_W, panel, status_color, stylesheet
 
+HEIGHT = 250
 THROUGHPUT_TARGET = 40.0  # events per week that counts as a "full" gauge
 MTTR_BUDGET_H = 24.0  # merges slower than this empty the gauge
 SWEEP_DEG = 240
-RADIUS = 44
-CY = 128
+RADIUS = 52
+CY = 140
 
 EXTRA_CSS = """
 @keyframes needle{from{transform:rotate(-120deg)}}
@@ -35,23 +36,26 @@ def gauges(ctx: RenderContext) -> tuple[Gauge, ...]:
     snap = ctx.snapshot
     avail = metrics.availability(snap)
     thru = metrics.throughput(snap)
+    thru_ratio = min(thru / THROUGHPUT_TARGET, 1.0)
     mttr = metrics.mttr_hours(snap)
     mttr_ratio = 0.0 if mttr is None else max(0.0, 1 - mttr / MTTR_BUDGET_H)
+    merge = metrics.merge_rate(snap)
     return (
         Gauge("AVAILABILITY", f"{avail:.0%}", "active days · 30d", avail, avail),
-        Gauge(
-            "THROUGHPUT",
-            f"{thru:.0f}/wk",
-            "events · 12w avg",
-            min(thru / THROUGHPUT_TARGET, 1.0),
-            min(thru / THROUGHPUT_TARGET, 1.0),
-        ),
+        Gauge("THROUGHPUT", f"{thru:.0f}/wk", "events · 12w avg", thru_ratio, thru_ratio),
         Gauge(
             "MTTR",
             "n/a" if mttr is None else format_hours(mttr),
             "PR open → merge p50",
             mttr_ratio,
             mttr_ratio,
+        ),
+        Gauge(
+            "MERGE RATE",
+            "n/a" if merge is None else f"{merge:.0%}",
+            "merged / closed PRs",
+            merge or 0.0,
+            merge or 0.0,
         ),
     )
 
@@ -75,24 +79,17 @@ def arc_path(cx: float, cy: float, r: float) -> str:
 def render(ctx: RenderContext) -> Markup:
     t = ctx.theme
     snap = ctx.snapshot
-    merge = metrics.merge_rate(snap)
-    centers = (HALF_W * 0.18, HALF_W * 0.5, HALF_W * 0.82)
-    footer = (
-        f"merge rate {merge:.0%}" if merge is not None else "merge rate n/a",
-        f"PRs {len(snap.pull_requests):,}",
-        f"commits {len(snap.commits):,}",
-    )
+    items = gauges(ctx)
+    centers = tuple(FULL_W * (2 * i + 1) / (2 * len(items)) for i in range(len(items)))
+    footer = f"PRs {len(snap.pull_requests):,}  ·  commits {len(snap.commits):,}"
     return document(
-        HALF_W,
-        HALF_H,
+        FULL_W,
+        HEIGHT,
         "Service level objectives",
         stylesheet(t, EXTRA_CSS),
-        panel(t, HALF_W, HALF_H, "SLO · error budget", "rolling windows"),
-        *(
-            _gauge(ctx, cx, g, i)
-            for i, (cx, g) in enumerate(zip(centers, gauges(ctx), strict=True))
-        ),
-        text(HALF_W / 2, HALF_H - 14, "  ·  ".join(footer), class_="sm mut", text_anchor="middle"),
+        panel(t, FULL_W, HEIGHT, "SLO · error budget", "rolling windows"),
+        *(_gauge(ctx, cx, g, i) for i, (cx, g) in enumerate(zip(centers, items, strict=True))),
+        text(FULL_W / 2, HEIGHT - 12, footer, class_="sm mut", text_anchor="middle"),
     )
 
 
@@ -102,10 +99,10 @@ def _gauge(ctx: RenderContext, cx: float, gauge: Gauge, index: int) -> Markup:
     track = arc_path(cx, CY, RADIUS)
     ticks = (
         line(
-            cx + (RADIUS - 13) * math.cos(math.radians(a)),
-            CY + (RADIUS - 13) * math.sin(math.radians(a)),
-            cx + (RADIUS - 9) * math.cos(math.radians(a)),
-            CY + (RADIUS - 9) * math.sin(math.radians(a)),
+            cx + (RADIUS - 15) * math.cos(math.radians(a)),
+            CY + (RADIUS - 15) * math.sin(math.radians(a)),
+            cx + (RADIUS - 10) * math.cos(math.radians(a)),
+            CY + (RADIUS - 10) * math.sin(math.radians(a)),
             class_="s-mut",
             stroke_width=1,
             opacity=0.6,
@@ -115,12 +112,12 @@ def _gauge(ctx: RenderContext, cx: float, gauge: Gauge, index: int) -> Markup:
     angle = -SWEEP_DEG / 2 + SWEEP_DEG * gauge.ratio
     wait = f"animation-delay:{0.2 + index * 0.2:.2f}s"
     return group(
-        path(track, fill="none", stroke=t.grid, stroke_width=8, stroke_linecap="round"),
+        path(track, fill="none", stroke=t.grid, stroke_width=9, stroke_linecap="round"),
         path(
             track,
             fill="none",
             stroke=color,
-            stroke_width=8,
+            stroke_width=9,
             stroke_linecap="round",
             pathLength=1,
             class_="draw",
@@ -135,11 +132,11 @@ def _gauge(ctx: RenderContext, cx: float, gauge: Gauge, index: int) -> Markup:
                 f"{wait}",
             },
             line(
-                cx, CY, cx, CY - RADIUS + 16, stroke=t.text, stroke_width=2, stroke_linecap="round"
+                cx, CY, cx, CY - RADIUS + 18, stroke=t.text, stroke_width=2, stroke_linecap="round"
             ),
         ),
-        circle(cx, CY, 4, fill=t.bg, stroke=t.text, stroke_width=1.5),
-        text(cx, CY + 34, gauge.value, class_="lg", text_anchor="middle", fill=color),
-        text(cx, 64, gauge.label, class_="sm mut", text_anchor="middle", letter_spacing="0.12em"),
-        text(cx, CY + 50, gauge.hint, class_="mut", font_size=8.5, text_anchor="middle"),
+        circle(cx, CY, 4.5, fill=t.bg, stroke=t.text, stroke_width=1.5),
+        text(cx, CY + 40, gauge.value, class_="lg", text_anchor="middle", fill=color),
+        text(cx, 66, gauge.label, class_="sm mut", text_anchor="middle", letter_spacing="0.12em"),
+        text(cx, CY + 56, gauge.hint, class_="mut", font_size=9, text_anchor="middle"),
     )

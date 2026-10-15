@@ -31,12 +31,27 @@ status:
 <!-- /pulse:manifest -->
 
 <p align="center">
-  <picture><source media="(prefers-color-scheme: dark)" srcset="assets/slo-dark.svg"><img src="assets/slo-light.svg" alt="SLO gauges: availability, throughput, MTTR" width="49%"></picture>
-  <picture><source media="(prefers-color-scheme: dark)" srcset="assets/timeseries-dark.svg"><img src="assets/timeseries-light.svg" alt="Weekly activity time series" width="49%"></picture>
-  <picture><source media="(prefers-color-scheme: dark)" srcset="assets/heatmap-dark.svg"><img src="assets/heatmap-light.svg" alt="Activity heatmap by hour and weekday" width="49%"></picture>
-  <picture><source media="(prefers-color-scheme: dark)" srcset="assets/trace-dark.svg"><img src="assets/trace-light.svg" alt="Trace waterfall of the last 14 days" width="49%"></picture>
-  <picture><source media="(prefers-color-scheme: dark)" srcset="assets/resources-dark.svg"><img src="assets/resources-light.svg" alt="Language usage" width="49%"></picture>
-  <picture><source media="(prefers-color-scheme: dark)" srcset="assets/pods-dark.svg"><img src="assets/pods-light.svg" alt="Public repositories as pods" width="49%"></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="assets/slo-dark.svg"><img src="assets/slo-light.svg" alt="SLO gauges: availability, throughput, MTTR" width="100%"></picture>
+</p>
+
+<p align="center">
+<picture><source media="(prefers-color-scheme: dark)" srcset="assets/timeseries-dark.svg"><img src="assets/timeseries-light.svg" alt="Weekly activity time series" width="100%"></picture>
+</p>
+
+<p align="center">
+<picture><source media="(prefers-color-scheme: dark)" srcset="assets/heatmap-dark.svg"><img src="assets/heatmap-light.svg" alt="Activity heatmap by hour and weekday" width="100%"></picture>
+</p>
+
+<p align="center">
+<picture><source media="(prefers-color-scheme: dark)" srcset="assets/trace-dark.svg"><img src="assets/trace-light.svg" alt="Trace waterfall of the last 14 days" width="100%"></picture>
+</p>
+
+<p align="center">
+<picture><source media="(prefers-color-scheme: dark)" srcset="assets/resources-dark.svg"><img src="assets/resources-light.svg" alt="Language usage" width="100%"></picture>
+</p>
+
+<p align="center">
+<picture><source media="(prefers-color-scheme: dark)" srcset="assets/pods-dark.svg"><img src="assets/pods-light.svg" alt="Public repositories as pods" width="100%"></picture>
 </p>
 
 <p align="center">

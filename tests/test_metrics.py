@@ -73,7 +73,9 @@ def test_heatmap_uses_local_timezone(snapshot):
 def test_trace_spans_window_and_privacy(snapshot):
     spans = metrics.trace_spans(snapshot)
     names = {s.service: s for s in spans}
-    assert names["workload-01"].is_private
+    assert names["private · Go service"].is_private
+    assert not any("workload" in s.service for s in spans)
+    assert "octo" not in names  # profile repo excluded
     assert not names["api"].is_private
     assert all(s.start <= s.end for s in spans)
     assert list(spans) == sorted(spans, key=lambda s: s.start)
@@ -105,7 +107,7 @@ def test_pods_exclude_private_fork_and_profile_repo(snapshot):
 
 def test_last_deploy_hides_private_names(snapshot):
     name, when = metrics.last_deploy(snapshot)
-    assert name == "private-workload"
+    assert name == "private repo"
     assert when <= NOW
     assert metrics.last_deploy(empty_snapshot()) is None
 
@@ -153,3 +155,22 @@ def test_compact_number():
     assert metrics.compact_number(999) == "999"
     assert metrics.compact_number(1_500) == "1.5k"
     assert metrics.compact_number(2_000_000) == "2M"
+
+
+def test_private_labels_number_only_on_collision(snapshot):
+    from dataclasses import replace as dc_replace
+
+    from pulse.models import Language, Repo
+
+    go = Language("Go", "#00ADD8", 1)
+    extra = Repo("private/workload-02", True, False, NOW, NOW, languages=(go,))
+    bare = Repo("private/workload-03", True, False, NOW, NOW)
+    snap = dc_replace(snapshot, repos=(*snapshot.repos, extra, bare))
+    labels = metrics.private_labels(
+        snap, ["private/workload-01", "private/workload-02", "private/workload-03"]
+    )
+    assert labels == {
+        "private/workload-01": "private · Go service 1",
+        "private/workload-02": "private · Go service 2",
+        "private/workload-03": "private · app service",
+    }

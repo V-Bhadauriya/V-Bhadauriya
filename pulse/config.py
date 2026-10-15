@@ -27,7 +27,7 @@ REPO_BATCH_SIZE = 8
 HISTORY_BATCH_SIZE = 2
 HISTORY_PAGE_SIZE = 50
 
-PRIVATE_LABEL = "private-workload"
+PRIVATE_LABEL = "private repo"
 MAX_SVG_BYTES = 100_000
 
 ASSET_NAMES = ("status", "activity", "slo", "timeseries", "heatmap", "trace", "resources", "pods")

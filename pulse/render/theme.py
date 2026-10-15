@@ -7,8 +7,6 @@ from dataclasses import dataclass
 from pulse.render.svg import Markup, circle, el, group, rect, text
 
 FULL_W = 860
-HALF_W = 424
-HALF_H = 236
 HEADER_H = 34
 PAD = 16
 FONT = "ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace"

@@ -5,9 +5,17 @@ from __future__ import annotations
 from pulse import metrics
 from pulse.render.context import RenderContext
 from pulse.render.svg import Markup, document, group, rect, text, truncate
-from pulse.render.theme import HALF_H, HALF_W, PAD, panel, stylesheet
+from pulse.render.theme import FULL_W, PAD, panel, stylesheet
 
-COLS = (("NAME", PAD), ("READY", 206), ("STATUS", 248), ("RESTARTS", 322), ("AGE", HALF_W - PAD))
+HEIGHT = 236
+COLS = (
+    ("NAME", PAD),
+    ("LANG", 392),
+    ("READY", 512),
+    ("STATUS", 580),
+    ("RESTARTS", 690),
+    ("AGE", FULL_W - PAD),
+)
 ROW_Y0, ROW_H = 98, 18
 MAX_ROWS = 6
 
@@ -28,11 +36,11 @@ def render(ctx: RenderContext) -> Markup:
         text(PAD, ROW_Y0, f"No resources found in {namespace} namespace.", class_="md mut")
     ]
     return document(
-        HALF_W,
-        HALF_H,
+        FULL_W,
+        HEIGHT,
         "Repositories as Kubernetes pods",
         stylesheet(t),
-        panel(t, HALF_W, HALF_H, "Workloads", f"{len(pods)} public pods"),
+        panel(t, FULL_W, HEIGHT, "Workloads", f"{len(pods)} public pods"),
         text(PAD, 58, "$", class_="md acc"),
         text(PAD + 14, 58, command, class_="md"),
         group(
@@ -62,11 +70,12 @@ def _row(ctx: RenderContext, pod: metrics.Pod, index: int) -> Markup:
     color = {"Running": t.ok, "Idle": t.warn}.get(pod.status, t.muted)
     ready = "1/1" if pod.status == "Running" else "0/1"
     return group(
-        text(COLS[0][1], y, truncate(pod.name, 24), class_="md"),
-        text(COLS[1][1], y, ready, class_="md mut"),
-        text(COLS[2][1], y, pod.status, class_="md", fill=color),
-        text(COLS[3][1], y, pod.restarts, class_="md mut"),
-        text(COLS[4][1], y, format_age(pod.age_days), class_="md mut", text_anchor="end"),
+        text(COLS[0][1], y, truncate(pod.name, 50), class_="md"),
+        text(COLS[1][1], y, truncate(pod.language, 14), class_="md mut"),
+        text(COLS[2][1], y, ready, class_="md mut"),
+        text(COLS[3][1], y, pod.status, class_="md", fill=color),
+        text(COLS[4][1], y, pod.restarts, class_="md mut"),
+        text(COLS[5][1], y, format_age(pod.age_days), class_="md mut", text_anchor="end"),
         class_="rise",
         style=f"animation-delay:{0.5 + index * 0.14:.2f}s",
     )
