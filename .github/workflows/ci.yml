@@ -27,7 +27,7 @@ jobs:
       - name: Install
         run: |
           pip install --require-hashes -r requirements.lock
-          pip install ".[dev]"
+          pip install -e ".[dev]"
 
       - name: Lint
         run: |
