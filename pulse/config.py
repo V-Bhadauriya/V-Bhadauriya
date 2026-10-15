@@ -15,6 +15,7 @@ MAX_RETRIES = 3
 RETRY_BACKOFF_S = 2.0
 MAX_RATE_LIMIT_WAIT_S = 120.0
 MAX_PAGES = 50
+SEARCH_RESULT_CAP = 1000  # GitHub search never returns more
 # Publish anyway if GitHub refused at most this share of items (e.g. a teammate's private repo).
 MAX_DENIED_RATIO = 0.05
 
@@ -77,6 +78,24 @@ class StackGroup:
 
 
 @dataclass(frozen=True)
+class Certification:
+    name: str
+    issuer: str
+    issued: int  # year
+    expires: int | None = None  # year
+    url: str = ""
+
+
+@dataclass(frozen=True)
+class Role:
+    title: str
+    org: str
+    start: str  # YYYY-MM
+    end: str | None  # YYYY-MM, None = current
+    summary: str = ""
+
+
+@dataclass(frozen=True)
 class Profile:
     login: str
     handle: str
@@ -90,6 +109,10 @@ class Profile:
     links: tuple[tuple[str, str], ...]
     kind: str = "Engineer"
     work: Work | None = None
+    feed_url: str | None = None
+    certifications: tuple[Certification, ...] = ()
+    experience: tuple[Role, ...] = ()
+    featured: tuple[str, ...] = ()
 
     @property
     def tz(self) -> ZoneInfo:
@@ -124,10 +147,10 @@ def parse_profile(raw: object) -> Profile:
 
     links = raw.get("links") or {}
     if not isinstance(links, dict) or not all(
-        isinstance(k, str) and isinstance(v, str) and v.startswith("https://")
+        isinstance(k, str) and isinstance(v, str) and v.startswith(("https://", "mailto:"))
         for k, v in links.items()
     ):
-        raise ConfigError("profile.links must map names to https:// URLs")
+        raise ConfigError("profile.links must map names to https:// or mailto: URLs")
 
     return Profile(
         login=raw["login"].strip(),
@@ -142,7 +165,59 @@ def parse_profile(raw: object) -> Profile:
         links=tuple(links.items()),
         kind=_kind(raw.get("kind", "Engineer")),
         work=_work(raw.get("work")),
+        feed_url=_https("feed_url", raw["feed_url"]) if raw.get("feed_url") else None,
+        certifications=tuple(_cert(c) for c in _mappings(raw, "certifications")),
+        experience=tuple(_role(r) for r in _mappings(raw, "experience")),
+        featured=tuple(_repo_name(n) for n in _str_list(raw, "featured")),
     )
+
+
+def _mappings(raw: dict, key: str) -> list[dict]:
+    value = raw.get(key) or []
+    if not isinstance(value, list) or not all(isinstance(v, dict) for v in value):
+        raise ConfigError(f"profile.{key} must be a list of mappings")
+    return value
+
+
+def _year(key: str, value: object) -> int:
+    if not isinstance(value, int) or not 1970 <= value <= 2100:
+        raise ConfigError(f"profile.{key} must be a year like 2024")
+    return value
+
+
+def _month(key: str, value: object) -> str:
+    text = str(value) if value is not None else ""
+    parts = text.split("-")
+    if len(parts) != 2 or not all(p.isdigit() for p in parts) or not 1 <= int(parts[1]) <= 12:
+        raise ConfigError(f"profile.{key} must look like 2024-03")
+    return text
+
+
+def _cert(raw: dict) -> Certification:
+    return Certification(
+        name=_text("certifications.name", raw.get("name")),
+        issuer=_text("certifications.issuer", raw.get("issuer")),
+        issued=_year("certifications.issued", raw.get("issued")),
+        expires=_year("certifications.expires", raw["expires"]) if raw.get("expires") else None,
+        url=_https("certifications.url", raw["url"]) if raw.get("url") else "",
+    )
+
+
+def _role(raw: dict) -> Role:
+    return Role(
+        title=_text("experience.title", raw.get("title")),
+        org=_text("experience.org", raw.get("org")),
+        start=_month("experience.start", raw.get("start")),
+        end=_month("experience.end", raw["end"]) if raw.get("end") else None,
+        summary=_text("experience.summary", raw["summary"]) if raw.get("summary") else "",
+    )
+
+
+def _repo_name(value: str) -> str:
+    owner, _, name = value.partition("/")
+    if not owner or not name or "/" in name:
+        raise ConfigError(f"profile.featured entries must look like owner/repo, got {value!r}")
+    return value
 
 
 def _stack(raw: object) -> tuple[StackGroup, ...]:

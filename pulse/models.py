@@ -37,6 +37,10 @@ class Repo:
     pushed_at: datetime
     stars: int = 0
     languages: tuple[Language, ...] = ()
+    # Public repos only; always empty for private repos.
+    description: str = ""
+    release_tag: str = ""
+    release_at: datetime | None = None
 
     @property
     def short_name(self) -> str:
@@ -50,6 +54,7 @@ class Commit:
     committed_at: datetime
     additions: int = 0
     deletions: int = 0
+    message: str = ""  # public repos only
 
 
 @dataclass(frozen=True)
@@ -59,6 +64,24 @@ class PullRequest:
     created_at: datetime
     merged_at: datetime | None
     state: str
+    title: str = ""  # public repos only
+
+
+@dataclass(frozen=True)
+class Review:
+    """Your first review on someone else's PR."""
+
+    repo: str
+    is_private: bool
+    pr_created_at: datetime
+    reviewed_at: datetime
+
+
+@dataclass(frozen=True)
+class Post:
+    title: str
+    url: str
+    published: date | None = None
 
 
 @dataclass(frozen=True)
@@ -77,6 +100,8 @@ class Snapshot:
     repos: tuple[Repo, ...] = ()
     commits: tuple[Commit, ...] = ()
     pull_requests: tuple[PullRequest, ...] = ()
+    reviews: tuple[Review, ...] = ()
+    posts: tuple[Post, ...] = ()
     meta: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -102,6 +127,9 @@ class Snapshot:
                     pushed_at=_dt(r["pushed_at"]),
                     stars=r.get("stars", 0),
                     languages=tuple(Language(**lang) for lang in r.get("languages", [])),
+                    description=r.get("description", ""),
+                    release_tag=r.get("release_tag", ""),
+                    release_at=_opt_dt(r.get("release_at")),
                 )
                 for r in data["repos"]
             ),
@@ -112,6 +140,7 @@ class Snapshot:
                     committed_at=_dt(c["committed_at"]),
                     additions=c.get("additions", 0),
                     deletions=c.get("deletions", 0),
+                    message=c.get("message", ""),
                 )
                 for c in data["commits"]
             ),
@@ -122,8 +151,26 @@ class Snapshot:
                     created_at=_dt(p["created_at"]),
                     merged_at=_opt_dt(p.get("merged_at")),
                     state=p["state"],
+                    title=p.get("title", ""),
                 )
                 for p in data["pull_requests"]
+            ),
+            reviews=tuple(
+                Review(
+                    repo=r["repo"],
+                    is_private=r["is_private"],
+                    pr_created_at=_dt(r["pr_created_at"]),
+                    reviewed_at=_dt(r["reviewed_at"]),
+                )
+                for r in data.get("reviews", [])
+            ),
+            posts=tuple(
+                Post(
+                    title=p["title"],
+                    url=p["url"],
+                    published=date.fromisoformat(p["published"]) if p.get("published") else None,
+                )
+                for p in data.get("posts", [])
             ),
             meta=dict(data.get("meta", {})),
         )

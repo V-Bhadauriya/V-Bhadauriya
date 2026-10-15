@@ -7,15 +7,17 @@ import json
 import logging
 import os
 import sys
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from xml.etree import ElementTree
 
-from pulse import config, readme
+from pulse import config, metrics, readme
 from pulse.config import ConfigError, Profile, load_profile
+from pulse.feed import fetch_posts
 from pulse.github_client import FetchResult, GitHubClient, GitHubError, fetch_snapshot
 from pulse.models import Snapshot
-from pulse.render import PANELS
+from pulse.render import HERO, enabled_specs
 from pulse.render.context import RenderContext
 from pulse.render.theme import THEMES
 
@@ -51,7 +53,11 @@ def load_snapshot(args: argparse.Namespace, profile: Profile) -> FetchResult:
         return FetchResult(Snapshot.from_dict(data), frozenset())
     token = os.environ.get("PULSE_TOKEN") or os.environ.get("GITHUB_TOKEN", "")
     client = GitHubClient(token)
-    return fetch_snapshot(client, profile.login, datetime.now(UTC))
+    fetched = fetch_snapshot(client, profile.login, datetime.now(UTC))
+    if not profile.feed_url:
+        return fetched
+    posts = fetch_posts(profile.feed_url)
+    return replace(fetched, snapshot=replace(fetched.snapshot, posts=posts))
 
 
 def render_assets(snapshot: Snapshot, profile: Profile) -> dict[str, str]:
@@ -59,9 +65,9 @@ def render_assets(snapshot: Snapshot, profile: Profile) -> dict[str, str]:
     assets: dict[str, str] = {}
     for theme in THEMES:
         ctx = RenderContext(snapshot=snapshot, profile=profile, theme=theme)
-        for name, renderer in PANELS.items():
-            filename = f"{name}-{theme.name}.svg"
-            svg = str(renderer(ctx))
+        for spec in enabled_specs(profile):
+            filename = f"{spec.name}-{theme.name}.svg"
+            svg = str(spec.render(ctx))
             validate_svg(filename, svg)
             assets[filename] = svg
     return assets
@@ -96,6 +102,14 @@ def check_completeness(snapshot: Snapshot) -> None:
         log.warning("publishing with %.1f%% of items refused to the token", ratio * 100)
 
 
+def warn_if_token_expiring(snapshot: Snapshot) -> None:
+    days = metrics.token_days_left(snapshot)
+    if days is not None and days <= metrics.TOKEN_WARN_DAYS:
+        # "::warning::" surfaces as an annotation on the Actions run summary.
+        print(f"::warning::PULSE_TOKEN expires in {days} days; create a new one soon.")
+        log.warning("PULSE_TOKEN expires in %d days", days)
+
+
 def check_for_leaks(outputs: dict[str, str], private_names: frozenset[str]) -> None:
     """Defence in depth: refuse to write anything that contains a real private repo name."""
     needles = [name.lower() for name in private_names]
@@ -110,11 +124,16 @@ def write_outputs(args: argparse.Namespace, profile: Profile, fetched: FetchResu
     snapshot = fetched.snapshot
     assets = render_assets(snapshot, profile)
     current = args.readme.read_text(encoding="utf-8")
+    specs = enabled_specs(profile)
+    alts = {s.name: s.alt for s in specs}
+    rest = [(s.name, s.alt) for s in specs if s.name not in HERO]
     updated = readme.replace_sections(
         current,
         {
-            "work": readme.work_banner(profile),
+            "hero": readme.hero(profile, alts),
             "manifest": readme.manifest(profile, snapshot),
+            "panels": readme.panels(rest, profile, snapshot),
+            "writing": readme.writing(snapshot),
             "links": readme.links(profile),
             "footer": readme.footer(snapshot),
         },
@@ -139,6 +158,7 @@ def main(argv: list[str] | None = None) -> int:
             args.save_snapshot.write_text(payload, "utf-8")
         if not args.allow_partial:
             check_completeness(fetched.snapshot)
+        warn_if_token_expiring(fetched.snapshot)
         write_outputs(args, profile, fetched)
     except (
         ConfigError,

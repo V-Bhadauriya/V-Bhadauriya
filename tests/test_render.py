@@ -133,3 +133,88 @@ def test_toolchain_layout_wraps_and_sizes():
     assert [label for line in lines for label, _, _ in line] == list(items)
     groups = (StackGroup("A", items), StackGroup("B", ("x",)))
     assert toolchain.height_for(groups) == toolchain.TOP + (len(lines) + 1) * toolchain.LINE_H + 10
+
+
+def _rich_profile():
+    from conftest import PROFILE_RAW
+
+    return parse_profile(
+        {
+            **PROFILE_RAW,
+            "certifications": [
+                {"name": "CKA", "issuer": "CNCF", "issued": 2023, "expires": 2026},
+                {"name": "Old cert", "issuer": "X", "issued": 2015, "expires": 2018},
+            ],
+            "experience": [
+                {"title": "Engineer", "org": "Old Co", "start": "2019-01", "end": "2022-06"},
+                {"title": "Data Scientist", "org": "Acme", "start": "2022-07", "summary": "LLMs"},
+            ],
+        }
+    )
+
+
+def test_optional_panels_render_configured_content(snapshot):
+    from pulse.render import certs, enabled_specs, experience
+
+    profile = _rich_profile()
+    names = [s.name for s in enabled_specs(profile)]
+    assert names[-2:] == ["experience", "certs"]
+    cert_svg = str(certs.render(RenderContext(snapshot, profile, DARK)))
+    assert "CKA" in cert_svg and ">False<" in cert_svg and ">True<" in cert_svg
+    exp_svg = str(experience.render(RenderContext(snapshot, profile, LIGHT)))
+    assert "deployed" in exp_svg and "superseded" in exp_svg and "Acme" in exp_svg
+
+
+def test_optional_panels_hidden_by_default(profile):
+    from pulse.render import enabled_specs
+
+    names = [s.name for s in enabled_specs(profile)]
+    assert "certs" not in names and "experience" not in names
+
+
+def test_alerts_and_reviews_with_data(snapshot, profile):
+    from dataclasses import replace
+    from datetime import timedelta
+
+    from conftest import NOW
+
+    from pulse.models import PullRequest, Review
+    from pulse.render import alerts, reviews
+
+    stale = tuple(
+        PullRequest("octo/api", False, NOW - timedelta(days=4 + i), None, "OPEN", f"pr {i}")
+        for i in range(7)
+    )
+    snap = replace(
+        snapshot,
+        pull_requests=snapshot.pull_requests + stale,
+        reviews=(Review("octo/api", False, NOW - timedelta(days=3), NOW - timedelta(days=2)),),
+    )
+    alert_svg = str(alerts.render(RenderContext(snap, profile, DARK)))
+    assert "+2 more firing" in alert_svg and "WARNING" in alert_svg
+    review_svg = str(reviews.render(RenderContext(snap, profile, DARK)))
+    assert "24.0h" in review_svg and "peak 1/wk" in review_svg
+
+
+def test_status_degrades_when_token_expires_soon(snapshot, profile):
+    from dataclasses import replace
+
+    soon = replace(snapshot, meta={"token_expires": "2026-10-20"})
+    svg = str(status.render(RenderContext(soon, profile, DARK)))
+    assert "DEGRADED" in svg and "expires in 5d" in svg
+    assert "OPERATIONAL" in str(status.render(RenderContext(snapshot, profile, DARK)))
+
+
+def test_record_cards_and_helpers(snapshot):
+    from pulse import insights
+    from pulse.render import churn, drift, records, servicemap
+
+    cards = records.record_cards(insights.year_records(snapshot))
+    assert len(cards) == 6
+    assert records._minutes(0.5) == "30s" and records._minutes(30) == "30 min"
+    assert records._minutes(180) == "3.0 h"
+    assert churn.scaled(0, 10) == 0 and churn.scaled(10, 10) == churn.HALF
+    assert servicemap.node_radius(0, 0) == servicemap.MIN_R
+    assert len(servicemap.node_positions(4)) == 4
+    bands = drift.band_paths(insights.language_drift(snapshot))
+    assert all(d.startswith("M") and d.endswith("Z") for _, _, d in bands)

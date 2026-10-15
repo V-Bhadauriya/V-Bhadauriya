@@ -66,11 +66,12 @@ def _identity(ctx: RenderContext) -> Markup:
     x = PAD + 10
     tagline = f"> {truncate(prof.tagline, 50)}"
     caret_x = x + len(tagline) * CHAR_W_13 + 3
+    state, color, note = _health(ctx)
     return group(
-        circle(x + 5, 31, 5, fill=t.ok, class_="ping"),
-        circle(x + 5, 31, 5, fill=t.ok),
-        text(x + 18, 35, "OPERATIONAL", class_="md ok", font_weight=700, letter_spacing="0.12em"),
-        text(x + 122, 35, f"· {prof.region}", class_="md mut"),
+        circle(x + 5, 31, 5, fill=color, class_="ping"),
+        circle(x + 5, 31, 5, fill=color),
+        text(x + 18, 35, state, class_="md", fill=color, font_weight=700, letter_spacing="0.12em"),
+        text(x + 18 + len(state) * 9.1 + 6, 35, f"· {note}", class_="md mut"),
         text(x, 78, prof.handle, class_="xl rise"),
         el(
             "g",
@@ -80,6 +81,15 @@ def _identity(ctx: RenderContext) -> Markup:
         rect(caret_x, 95, 7, 14, fill=t.accent, class_="blink"),
         text(x, 128, f"role={prof.role}  tz={prof.timezone}", class_="sm mut fade"),
     )
+
+
+def _health(ctx: RenderContext) -> tuple[str, str, str]:
+    """OPERATIONAL normally; DEGRADED when the data token is about to expire."""
+    t = ctx.theme
+    days = metrics.token_days_left(ctx.snapshot)
+    if days is not None and days <= metrics.TOKEN_WARN_DAYS:
+        return "DEGRADED", t.warn, f"data token expires in {max(days, 0)}d"
+    return "OPERATIONAL", t.ok, ctx.profile.region
 
 
 def _kpis(ctx: RenderContext) -> Markup:

@@ -1,0 +1,22 @@
+query Reviews($q: String!, $login: String!, $cursor: String) {
+  search(query: $q, type: ISSUE, first: 50, after: $cursor) {
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+    nodes {
+      ... on PullRequest {
+        createdAt
+        repository {
+          nameWithOwner
+          isPrivate
+        }
+        reviews(first: 5, author: $login) {
+          nodes {
+            submittedAt
+          }
+        }
+      }
+    }
+  }
+}

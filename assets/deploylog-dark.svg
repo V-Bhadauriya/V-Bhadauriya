@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="316" viewBox="0 0 860 316" role="img" aria-label="Live deploy log of recent commits and pull requests"><title>Live deploy log of recent commits and pull requests</title><style>
+text{font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace;fill:#d6e2ee;}
+.mut{fill:#6e7f91;} .acc{fill:#38e1c6;} .acc2{fill:#8b7cf6;}
+.ok{fill:#3fd07f;} .warn{fill:#f2b134;} .crit{fill:#ff5d6c;}
+.s-acc{stroke:#38e1c6;} .s-grid{stroke:#18212b;} .s-mut{stroke:#6e7f91;}
+.ttl{font-size:11px;letter-spacing:.14em;font-weight:700;}
+.sm{font-size:10px;} .md{font-size:12px;} .lg{font-size:20px;font-weight:700;}
+.xl{font-size:28px;font-weight:800;letter-spacing:-.01em;}
+@keyframes fade{from{opacity:0}}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}}
+@keyframes draw{from{stroke-dashoffset:1}}
+@keyframes growx{from{transform:scaleX(0)}}
+@keyframes growy{from{transform:scaleY(0)}}
+@keyframes ping{0%{opacity:.7;transform:scale(1)}100%{opacity:0;transform:scale(3.2)}}
+@keyframes blink{50%{opacity:0}}
+@keyframes glow{50%{opacity:.35}}
+.fade{animation:fade .9s ease-out both;}
+.rise{animation:rise .7s cubic-bezier(.2,.7,.2,1) both;}
+.draw{stroke-dasharray:1;stroke-dashoffset:0;animation:draw 2.4s cubic-bezier(.6,.1,.2,1) both;}
+.growx{transform-box:fill-box;transform-origin:left center;
+  animation:growx .9s cubic-bezier(.2,.7,.2,1) both;}
+.growy{transform-box:fill-box;transform-origin:center bottom;
+  animation:growy .8s cubic-bezier(.2,.7,.2,1) both;}
+.ping{transform-box:fill-box;transform-origin:center;animation:ping 2s ease-out infinite;}
+.blink{animation:blink 1.1s steps(1) infinite;}
+.glow{animation:glow 2.6s ease-in-out infinite;}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important;}}
+</style><g><defs><pattern id="dots" width="14" height="14" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="0.9" fill="#18212b"/></pattern></defs><rect x="0.5" y="0.5" width="859" height="315" rx="10" fill="#0f141b" stroke="#1e2732"/><rect x="1" y="34" width="858" height="281" fill="url(#dots)" opacity="0.9"/><line x1="1" y1="34" x2="859" y2="34" stroke="#1e2732"/><rect x="16" y="13" width="8" height="8" rx="2" fill="#38e1c6"/><text x="32" y="21" class="ttl">DEPLOY LOG · LIVE</text><text x="844" y="21" class="sm mut" text-anchor="end">tail -n 10 · America/Los_Angeles</text></g><text x="16" y="58" class="md acc">$</text><text x="30" y="58" class="md">kubectl logs -f deploy/vivek --since=365d</text><g class="fade" style="animation-delay:1.50s"><text x="16" y="82" class="md mut">10-15 04:55</text><text x="132" y="82" class="md" fill="#8b7cf6" font-weight="700">[COMMIT]</text><text x="206" y="82" class="md acc">private · TypeScript service 1</text><text x="470" y="82" class="md">pushed commit</text></g><g class="fade" style="animation-delay:1.38s"><text x="16" y="102" class="md mut">10-15 04:55</text><text x="132" y="102" class="md" fill="#3fd07f" font-weight="700">[MERGE]</text><text x="206" y="102" class="md acc">private · TypeScript service 1</text><text x="470" y="102" class="md">merged: pull request</text></g><g class="fade" style="animation-delay:1.26s"><text x="16" y="122" class="md mut">10-15 04:52</text><text x="132" y="122" class="md" fill="#8b7cf6" font-weight="700">[COMMIT]</text><text x="206" y="122" class="md acc">private · TypeScript service 1</text><text x="470" y="122" class="md">pushed commit</text></g><g class="fade" style="animation-delay:1.14s"><text x="16" y="142" class="md mut">10-15 04:46</text><text x="132" y="142" class="md" fill="#f2b134" font-weight="700">[PR]</text><text x="206" y="142" class="md acc">private · TypeScript service 1</text><text x="470" y="142" class="md">opened: pull request</text></g><g class="fade" style="animation-delay:1.02s"><text x="16" y="162" class="md mut">10-15 04:46</text><text x="132" y="162" class="md" fill="#8b7cf6" font-weight="700">[COMMIT]</text><text x="206" y="162" class="md acc">private · TypeScript service 1</text><text x="470" y="162" class="md">pushed commit</text></g><g class="fade" style="animation-delay:0.90s"><text x="16" y="182" class="md mut">10-15 02:44</text><text x="132" y="182" class="md" fill="#8b7cf6" font-weight="700">[COMMIT]</text><text x="206" y="182" class="md acc">private · TypeScript service 1</text><text x="470" y="182" class="md">pushed commit</text></g><g class="fade" style="animation-delay:0.78s"><text x="16" y="202" class="md mut">10-15 02:44</text><text x="132" y="202" class="md" fill="#3fd07f" font-weight="700">[MERGE]</text><text x="206" y="202" class="md acc">private · TypeScript service 1</text><text x="470" y="202" class="md">merged: pull request</text></g><g class="fade" style="animation-delay:0.66s"><text x="16" y="222" class="md mut">10-15 02:43</text><text x="132" y="222" class="md" fill="#8b7cf6" font-weight="700">[COMMIT]</text><text x="206" y="222" class="md acc">private · TypeScript service 1</text><text x="470" y="222" class="md">pushed commit</text></g><g class="fade" style="animation-delay:0.54s"><text x="16" y="242" class="md mut">10-15 02:43</text><text x="132" y="242" class="md" fill="#8b7cf6" font-weight="700">[COMMIT]</text><text x="206" y="242" class="md acc">private · TypeScript service 1</text><text x="470" y="242" class="md">pushed commit</text></g><g class="fade" style="animation-delay:0.42s"><text x="16" y="262" class="md mut">10-15 02:43</text><text x="132" y="262" class="md" fill="#8b7cf6" font-weight="700">[COMMIT]</text><text x="206" y="262" class="md acc">private · TypeScript service 1</text><text x="470" y="262" class="md">pushed commit</text></g><text x="16" y="286" class="md acc">$</text><rect x="30" y="276" width="7" height="13" fill="#38e1c6" class="blink"/></svg>

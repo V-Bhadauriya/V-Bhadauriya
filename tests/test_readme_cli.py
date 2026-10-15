@@ -10,7 +10,9 @@ from pulse import __main__ as cli
 from pulse import readme
 
 README = """# hi
-<!-- pulse:work --><!-- /pulse:work -->
+<!-- pulse:hero --><!-- /pulse:hero -->
+<!-- pulse:panels --><!-- /pulse:panels -->
+<!-- pulse:writing --><!-- /pulse:writing -->
 <!-- pulse:manifest -->
 old
 <!-- /pulse:manifest -->
@@ -79,7 +81,7 @@ def _args(ws: Path) -> list[str]:
 def test_cli_renders_all_assets_and_readme(workspace):
     assert cli.main([*_args(workspace), "--save-snapshot", str(workspace / "out.json")]) == 0
     files = sorted(p.name for p in (workspace / "assets").iterdir())
-    assert len(files) == 18
+    assert len(files) == 34  # 17 panels x 2 themes; certs/experience off
     assert "status-dark.svg" in files and "pods-light.svg" in files
     assert "apiVersion: human.dev/v1" in (workspace / "README.md").read_text(encoding="utf-8")
     assert json.loads((workspace / "out.json").read_text())["login"] == "octo"
@@ -171,3 +173,46 @@ def test_manifest_renders_grouped_stack(snapshot, profile):
     text = readme.manifest(grouped, snapshot)
     assert "  stack:\n    mlops: [Kubeflow, MLflow]" in text
     assert "  stack: [Go, Python]" in readme.manifest(profile, snapshot)
+
+
+def test_hero_panels_and_writing_sections(snapshot, profile):
+    from dataclasses import replace
+    from datetime import date
+
+    from pulse.models import Post
+
+    hero = readme.hero(profile, {"status": "S", "activity": "A"})
+    assert hero.count("<picture>") == 2
+    block = readme.panels([("featured", "F"), ("pods", "P")], profile, snapshot)
+    assert 'href="https://github.com/octo/api"' in block
+    assert block.index("featured-light.svg") < block.index("octo/api") < block.index("pods")
+    assert readme.writing(snapshot) == ""
+    posts = (Post("A <b>post</b>", "https://x.example/a", date(2026, 9, 1)),)
+    text = readme.writing(replace(snapshot, posts=posts))
+    assert "A &lt;b&gt;post&lt;/b&gt;" in text and "Sep 01, 2026" in text
+
+
+def test_token_expiry_warning(snapshot, capsys):
+    from dataclasses import replace
+
+    cli.warn_if_token_expiring(replace(snapshot, meta={"token_expires": "2026-10-25"}))
+    assert "::warning::PULSE_TOKEN expires in 10 days" in capsys.readouterr().out
+    cli.warn_if_token_expiring(replace(snapshot, meta={"token_expires": "2027-10-25"}))
+    cli.warn_if_token_expiring(replace(snapshot, meta={"token_expires": "nonsense"}))
+    assert capsys.readouterr().out == ""
+
+
+def test_live_load_attaches_feed_posts(monkeypatch, tmp_path, snapshot):
+    from pulse.config import parse_profile
+    from pulse.github_client import FetchResult
+    from pulse.models import Post
+
+    monkeypatch.setenv("PULSE_TOKEN", "t")
+    monkeypatch.setattr(cli, "fetch_snapshot", lambda *a: FetchResult(snapshot, frozenset()))
+    monkeypatch.setattr(cli, "fetch_posts", lambda url: (Post("p", "https://x.example/p"),))
+    from conftest import PROFILE_RAW
+
+    args = cli.parse_args(["--readme", str(tmp_path / "R.md")])
+    with_feed = parse_profile({**PROFILE_RAW, "feed_url": "https://x.example/rss"})
+    assert cli.load_snapshot(args, with_feed).snapshot.posts[0].title == "p"
+    assert cli.load_snapshot(args, parse_profile(PROFILE_RAW)).snapshot.posts == ()

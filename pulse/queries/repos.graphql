@@ -17,6 +17,11 @@ query Repos($login: String!, $cursor: String) {
         createdAt
         pushedAt
         stargazerCount
+        description
+        latestRelease {
+          tagName
+          publishedAt
+        }
         languages(first: 8, orderBy: { field: SIZE, direction: DESC }) {
           edges {
             size

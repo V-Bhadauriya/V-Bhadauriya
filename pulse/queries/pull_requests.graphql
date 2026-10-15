@@ -6,6 +6,7 @@ query PullRequests($login: String!, $cursor: String) {
         endCursor
       }
       nodes {
+        title
         createdAt
         mergedAt
         state

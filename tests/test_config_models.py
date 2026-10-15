@@ -93,3 +93,34 @@ def test_stack_accepts_flat_list_or_groups():
         parse_profile({**PROFILE_RAW, "stack": {"ML": "PyTorch"}})
     with pytest.raises(ConfigError, match="stack"):
         parse_profile({**PROFILE_RAW, "stack": 42})
+
+
+def test_profile_extras_parse_and_validate():
+    full = parse_profile(
+        {
+            **PROFILE_RAW,
+            "feed_url": "https://blog.example/rss",
+            "featured": ["octo/api"],
+            "links": {"email": "mailto:me@example.com"},
+            "certifications": [
+                {"name": "CKA", "issuer": "CNCF", "issued": 2023, "url": "https://c.example/"}
+            ],
+            "experience": [{"title": "DS", "org": "Acme", "start": "2022-07", "end": "2024-01"}],
+        }
+    )
+    assert full.feed_url == "https://blog.example/rss"
+    assert full.certifications[0].expires is None
+    assert full.experience[0].end == "2024-01"
+    assert full.featured == ("octo/api",)
+    bad = [
+        ({"feed_url": "http://insecure"}, "feed_url"),
+        ({"featured": ["no-slash"]}, "featured"),
+        ({"certifications": "CKA"}, "certifications"),
+        ({"certifications": [{"name": "C", "issuer": "I", "issued": 99}]}, "year"),
+        ({"experience": [{"title": "T", "org": "O", "start": "2024/01"}]}, "2024-03"),
+        ({"experience": [{"title": "T", "org": "O", "start": "2024-13"}]}, "2024-03"),
+        ({"links": {"x": "javascript:alert(1)"}}, "links"),
+    ]
+    for patch, message in bad:
+        with pytest.raises(ConfigError, match=message):
+            parse_profile({**PROFILE_RAW, **patch})

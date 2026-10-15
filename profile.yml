@@ -38,3 +38,31 @@ links:
   niriksha.ai: https://niriksha.ai/
   sandatasystem.ai: https://sandatasystem.ai/
   github: https://github.com/V-Bhadauriya
+
+# --- Optional sections: uncomment and fill in to switch the matching panel on. ---
+
+# Pin which public repos appear in the "Featured" panel (default: your most active ones).
+# featured:
+#   - san-data-systems/niriksha-sdk-go
+#   - san-data-systems/niriksha-sdk-python
+
+# Latest posts from your blog / Medium / dev.to RSS or Atom feed.
+# feed_url: https://medium.com/feed/@your-handle
+
+# Shown as "kubectl get certificates" (READY turns False after the expiry year).
+# certifications:
+#   - name: Certified Kubernetes Administrator (CKA)
+#     issuer: CNCF
+#     issued: 2024
+#     expires: 2027
+
+# Shown as "helm history", oldest first; omit `end` for your current role.
+# experience:
+#   - title: Data Scientist
+#     org: SAN Data Systems
+#     start: 2025-05
+#     summary: LLM observability and MLOps for NirikshaAI
+
+# More contact links (https:// or mailto:) can go under `links` above, e.g.
+#   linkedin: https://www.linkedin.com/in/your-profile
+#   email: mailto:you@example.com

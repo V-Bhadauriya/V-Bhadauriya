@@ -186,7 +186,7 @@ def trace_spans(snapshot: Snapshot, max_spans: int = 7) -> tuple[Span, ...]:
         if event.at >= window_start and repo.lower() != profile_repo:
             grouped[repo] = [*grouped.get(repo, []), event]
     busiest = sorted(grouped, key=lambda r: (-len(grouped[r]), r))[:max_spans]
-    labels = private_labels(snapshot, [r for r in busiest if is_anonymised(r)])
+    labels = global_private_labels(snapshot)
     spans = [
         Span(
             service=labels.get(repo, repo.split("/")[-1]),
@@ -198,6 +198,21 @@ def trace_spans(snapshot: Snapshot, max_spans: int = 7) -> tuple[Span, ...]:
         for repo in busiest
     ]
     return tuple(sorted(spans, key=lambda s: s.start))
+
+
+def global_private_labels(snapshot: Snapshot) -> dict[str, str]:
+    """Private labels numbered across *all* private repos by activity, so a label like
+    "private · Go service 2" means the same repo in every panel."""
+    activity = Counter(c.repo for c in snapshot.commits) + Counter(
+        p.repo for p in snapshot.pull_requests
+    )
+    names = (
+        {r.name_with_owner for r in snapshot.repos}
+        | set(activity)
+        | {r.repo for r in snapshot.reviews}
+    )
+    ordered = sorted((n for n in names if is_anonymised(n)), key=lambda n: (-activity[n], n))
+    return private_labels(snapshot, ordered)
 
 
 def private_labels(snapshot: Snapshot, aliases: list[str]) -> dict[str, str]:
@@ -361,3 +376,17 @@ def compact_number(value: int) -> str:
         if abs(value) >= size:
             return f"{value / size:.1f}".rstrip("0").rstrip(".") + suffix
     return f"{value:,}"
+
+
+TOKEN_WARN_DAYS = 14
+
+
+def token_days_left(snapshot: Snapshot) -> int | None:
+    """Days until the PAT expires, from the header GitHub returns; None if unknown."""
+    raw = snapshot.meta.get("token_expires")
+    if not raw:
+        return None
+    try:
+        return (date.fromisoformat(str(raw)) - snapshot.fetched_at.date()).days
+    except ValueError:
+        return None

@@ -263,6 +263,22 @@ def _fake_github(request: httpx.Request) -> httpx.Response:
     if query.startswith("query PullRequests"):
         page = {"pageInfo": {"hasNextPage": False}, "nodes": PRS}
         return httpx.Response(200, json={"data": {"user": {"pullRequests": page}}})
+    if query.startswith("query Reviews"):
+        nodes = [
+            {
+                "createdAt": "2026-10-10T00:00:00Z",
+                "repository": {"nameWithOwner": "reviewco/secret-svc", "isPrivate": True},
+                "reviews": {"nodes": [{"submittedAt": "2026-10-10T03:00:00Z"}]},
+            },
+            {"createdAt": "2026-10-11T00:00:00Z", "repository": None, "reviews": None},
+            {
+                "createdAt": "2026-10-11T00:00:00Z",
+                "repository": {"nameWithOwner": "octo/api", "isPrivate": False},
+                "reviews": {"nodes": []},
+            },
+        ]
+        page = {"pageInfo": {"hasNextPage": False}, "nodes": nodes}
+        return httpx.Response(200, json={"data": {"search": page}})
     if query.startswith("query RepoDetails"):
         data = {}
         for i in range(10):
@@ -292,15 +308,24 @@ def test_fetch_snapshot_end_to_end_anonymises_private_repos(client):
     assert snap.login == "octo"
     # 3 listed + 1 org repo reached only via contributions (team membership)
     assert len(snap.repos) == 4
-    assert result.private_names == frozenset({"secretcorp/top-secret", "teamorg/platform"})
+    assert result.private_names == frozenset(
+        {"secretcorp/top-secret", "teamorg/platform", "reviewco/secret-svc"}
+    )
+    # one usable review (the others lack a repo or a submitted review)
+    assert len(snap.reviews) == 1 and snap.reviews[0].is_private
     # three active repos x two history pages
     assert len(snap.commits) == 6
     # PR older than the lookback window is dropped
     assert len(snap.pull_requests) == 1
-    assert snap.meta == {"private_repos": 2, "unreadable_repos": 0, "denied": 0}
+    assert snap.meta == {
+        "private_repos": 3,
+        "unreadable_repos": 0,
+        "denied": 0,
+        "token_expires": None,
+    }
     dumped = json.dumps(snap.to_dict())
     assert "secretcorp" not in dumped and "top-secret" not in dumped
-    assert "teamorg" not in dumped
+    assert "teamorg" not in dumped and "reviewco" not in dumped
     assert snap.repos[0].languages[0].color == "#8b949e"
 
 
@@ -336,3 +361,97 @@ def test_unreadable_repos_are_counted(client):
     result = fetch_snapshot(client, "octo", NOW)
     assert result.snapshot.meta["unreadable_repos"] >= 1
     assert result.snapshot.meta["denied"] >= 1
+
+
+@respx.mock
+def test_token_expiry_header_is_recorded(client):
+    headers = {"github-authentication-token-expiration": "2026-11-01 00:00:00 UTC"}
+    respx.post(URL).mock(
+        return_value=httpx.Response(200, json={"data": {"ok": 1}}, headers=headers)
+    )
+    client.query("{ ok }", {})
+    assert client.token_expires == "2026-11-01"
+
+
+def test_parse_token_expiry():
+    from pulse.github_client import parse_token_expiry
+
+    assert parse_token_expiry("2026-12-31 00:00:00 -0800") == "2026-12-31"
+    assert parse_token_expiry("") is None
+    assert parse_token_expiry("garbage!!") is None
+
+
+def test_private_free_text_is_dropped():
+    pr_nodes = [
+        {
+            "title": "Fix secret billing bug for BigCustomer",
+            "createdAt": "2026-10-10T00:00:00Z",
+            "mergedAt": None,
+            "state": "OPEN",
+            "repository": {"nameWithOwner": "corp/billing", "isPrivate": True},
+        },
+        {
+            "title": "docs: readme",
+            "createdAt": "2026-10-10T00:00:00Z",
+            "mergedAt": None,
+            "state": "OPEN",
+            "repository": {"nameWithOwner": "octo/api", "isPrivate": False},
+        },
+    ]
+    repos = [
+        {**REPOS[0]},
+        {
+            **REPOS[1],
+            "nameWithOwner": "corp/billing",
+            "description": "internal billing",
+            "latestRelease": {"tagName": "v9", "publishedAt": "2026-01-01T00:00:00Z"},
+        },
+    ]
+    commits = {
+        "corp/billing": [{"committedDate": "2026-10-10T00:00:00Z", "messageHeadline": "secret"}],
+        "octo/api": [{"committedDate": "2026-10-10T00:00:00Z", "messageHeadline": "feat: x"}],
+    }
+    snap = build_snapshot(USER, repos, pr_nodes, commits, NOW)
+    dumped = json.dumps(snap.to_dict())
+    for secret in ("BigCustomer", "internal billing", "v9", '"secret"', "corp/"):
+        assert secret not in dumped
+    assert "docs: readme" in dumped and "feat: x" in dumped
+
+
+def test_reviews_before_window_are_ignored_and_times_are_utc():
+    old_and_new = [
+        {
+            "createdAt": "2024-01-01T00:00:00Z",
+            "repository": {"nameWithOwner": "octo/api", "isPrivate": False},
+            "reviews": {"nodes": [{"submittedAt": "2024-01-02T00:00:00Z"}]},
+        },
+        {
+            "createdAt": "2026-10-01T00:00:00Z",
+            "repository": {"nameWithOwner": "octo/api", "isPrivate": False},
+            "reviews": {"nodes": [{"submittedAt": "2026-10-01T23:30:00-05:00"}]},
+        },
+    ]
+    snap = build_snapshot(USER, [REPOS[0]], [], {}, NOW, old_and_new)
+    assert len(snap.reviews) == 1
+    assert snap.reviews[0].reviewed_at.isoformat() == "2026-10-02T04:30:00+00:00"
+
+
+def test_alias_numbers_do_not_depend_on_result_order():
+    a = {**REPOS[1], "nameWithOwner": "corp/a"}
+    b = {**REPOS[1], "nameWithOwner": "corp/b"}
+    first = build_snapshot(USER, [a, b], [], {}, NOW)
+    second = build_snapshot(USER, [b, a], [], {}, NOW)
+    assert {r.name_with_owner for r in first.repos} == {r.name_with_owner for r in second.repos}
+    assert first.repos[0].name_with_owner == second.repos[1].name_with_owner
+
+
+def test_public_text_mentioning_private_repo_is_blanked():
+    from pulse.github_client import public_text_scrubber
+
+    scrub = public_text_scrubber({"corp/billing-core": "private/workload-01", "corp/api": "x"})
+    assert scrub("bump billing-core to v2") == ""
+    assert scrub("Billing-Core fix") == ""
+    assert scrub("billing-corex unrelated") == "billing-corex unrelated"
+    assert scrub("api docs") == "api docs"  # short names are not scrubbed
+    assert scrub(None) == ""
+    assert public_text_scrubber({})("anything") == "anything"

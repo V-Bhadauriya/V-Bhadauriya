@@ -6,7 +6,7 @@ import re
 from collections.abc import Callable, Mapping
 from html import escape
 
-from pulse import metrics
+from pulse import insights, metrics
 from pulse.config import Profile
 from pulse.models import Snapshot
 
@@ -131,3 +131,56 @@ def footer(snapshot: Snapshot) -> str:
         "refreshed every 6h by a GitHub Action · rendered by "
         '<a href="pulse"><code>pulse</code></a> — no third-party widgets</sub>'
     )
+
+
+# --------------------------------------------------------------------------- panel layout
+
+
+def picture(name: str, alt: str) -> str:
+    """Theme-aware image: GitHub swaps in the dark variant for dark-mode readers."""
+    return (
+        f'<p align="center">\n<picture><source media="(prefers-color-scheme: dark)" '
+        f'srcset="assets/{name}-dark.svg"><img src="assets/{name}-light.svg" '
+        f'alt="{escape(alt)}" width="100%"></picture>\n</p>'
+    )
+
+
+def hero(profile: Profile, alts: Mapping[str, str]) -> str:
+    banner = work_banner(profile)
+    parts = [picture("status", alts["status"])]
+    if banner:
+        parts.append(f'<p align="center">\n{banner}\n</p>')
+    parts.append(picture("activity", alts["activity"]))
+    return "\n\n".join(parts)
+
+
+def panels(names_and_alts: list[tuple[str, str]], profile: Profile, snapshot: Snapshot) -> str:
+    """Every non-hero panel, one per row, with clickable repo links under 'featured'."""
+    blocks = []
+    for name, alt in names_and_alts:
+        blocks.append(picture(name, alt))
+        if name == "featured":
+            line = featured_links(profile, snapshot)
+            if line:
+                blocks.append(f'<p align="center">{line}</p>')
+    return "\n\n".join(blocks)
+
+
+def featured_links(profile: Profile, snapshot: Snapshot) -> str:
+    items = insights.featured_repos(snapshot, profile.featured)
+    return " · ".join(
+        f'<a href="https://github.com/{escape(f.repo.name_with_owner)}">'
+        f"<code>{escape(f.repo.short_name)}</code></a>"
+        for f in items
+    )
+
+
+def writing(snapshot: Snapshot) -> str:
+    if not snapshot.posts:
+        return ""
+    rows = [
+        f'<a href="{escape(p.url)}">{escape(p.title)}</a>'
+        + (f" <sub>{p.published:%b %d, %Y}</sub>" if p.published else "")
+        for p in snapshot.posts
+    ]
+    return '<p align="center">\n<b>latest writing</b><br>\n' + "<br>\n".join(rows) + "\n</p>"

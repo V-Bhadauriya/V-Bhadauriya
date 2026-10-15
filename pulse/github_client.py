@@ -3,17 +3,18 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, replace
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from importlib import resources
 from typing import Any
 
 import httpx
 
 from pulse import config
-from pulse.models import Commit, Day, Language, PullRequest, Repo, Snapshot
+from pulse.models import Commit, Day, Language, PullRequest, Repo, Review, Snapshot
 from pulse.privacy import alias, build_alias_map
 
 log = logging.getLogger(__name__)
@@ -30,7 +31,9 @@ def load_query(name: str) -> str:
 
 
 def _parse_dt(value: str) -> datetime:
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    """Always UTC: commit GitTimestamps keep the author's offset (e.g. -05:00), which would
+    otherwise put late-evening commits in a different day or month than PRs."""
+    return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(UTC)
 
 
 class GitHubClient:
@@ -49,6 +52,12 @@ class GitHubClient:
         }
         self._sleep = sleep
         self._denied = 0
+        self._token_expires: str | None = None
+
+    @property
+    def token_expires(self) -> str | None:
+        """Expiry GitHub reports for the token (PATs only), as an ISO date."""
+        return self._token_expires
 
     @property
     def denied(self) -> int:
@@ -66,6 +75,12 @@ class GitHubClient:
                 rate_wait = None
             else:
                 if response.status_code == 200:
+                    self._token_expires = (
+                        parse_token_expiry(
+                            response.headers.get("github-authentication-token-expiration", "")
+                        )
+                        or self._token_expires
+                    )
                     return self._unwrap(response.json())
                 if response.status_code in (401, 403) and not _is_rate_limited(response):
                     raise GitHubError(f"GitHub rejected the token (HTTP {response.status_code})")
@@ -96,6 +111,15 @@ class GitHubClient:
         if data is None:
             raise GitHubError("GraphQL response contained no data")
         return data
+
+
+def parse_token_expiry(value: str) -> str | None:
+    """GitHub sends e.g. "2026-12-31 00:00:00 UTC" or "... -0800"; keep just the date."""
+    stamp = value.strip()[:10]
+    try:
+        return date.fromisoformat(stamp).isoformat() if stamp else None
+    except ValueError:
+        return None
 
 
 _ERROR_CATEGORIES = (
@@ -185,8 +209,21 @@ def _paginate(
     log.warning("stopped paginating %s after %d pages", query_name, config.MAX_PAGES)
 
 
+def fetch_reviews(client: GitHubClient, login: str, since: datetime) -> list[dict[str, Any]]:
+    """PRs by others that you reviewed in the window (GitHub search caps this at 1000)."""
+    search = f"type:pr reviewed-by:{login} -author:{login} updated:>={since:%Y-%m-%d}"
+    nodes = list(_paginate(client, "reviews", {"q": search, "login": login}, ("search",)))
+    if len(nodes) >= config.SEARCH_RESULT_CAP:
+        log.warning(
+            "review search hit GitHub's %d-result cap; counts are a lower bound",
+            config.SEARCH_RESULT_CAP,
+        )
+    return nodes
+
+
 _REPO_FIELDS = (
-    "nameWithOwner isPrivate isFork createdAt pushedAt stargazerCount "
+    "nameWithOwner isPrivate isFork createdAt pushedAt stargazerCount description "
+    "latestRelease { tagName publishedAt } "
     "languages(first: 8, orderBy: {field: SIZE, direction: DESC}) "
     "{ edges { size node { name color } } }"
 )
@@ -231,7 +268,8 @@ def contributed_repo_names(user: dict[str, Any], pr_nodes: list[dict[str, Any]])
 _HISTORY_SELECTION = (
     "defaultBranchRef { target { ... on Commit { "
     "history(first: %(page)d, after: $c%(i)d, since: $since, author: {id: $author}) { "
-    "pageInfo { hasNextPage endCursor } nodes { committedDate additions deletions } "
+    "pageInfo { hasNextPage endCursor } "
+    "nodes { committedDate additions deletions messageHeadline } "
     "} } } }"
 )
 
@@ -305,14 +343,54 @@ def fetch_snapshot(client: GitHubClient, login: str, now: datetime) -> FetchResu
 
     active = [r["nameWithOwner"] for r in repo_nodes if _parse_dt(r["pushedAt"]) >= since]
     commit_nodes, unreadable = fetch_commits(client, user["id"], active, since)
+    review_nodes = fetch_reviews(client, login, since)
 
-    snapshot = build_snapshot(user, repo_nodes, pr_nodes, commit_nodes, now)
-    private_names = frozenset(
-        [r["nameWithOwner"] for r in repo_nodes if r["isPrivate"]]
-        + [p["repository"]["nameWithOwner"] for p in pr_nodes if p["repository"]["isPrivate"]]
-    )
-    meta = {**snapshot.meta, "unreadable_repos": unreadable, "denied": client.denied}
+    snapshot = build_snapshot(user, repo_nodes, pr_nodes, commit_nodes, now, review_nodes)
+    private_names = frozenset(_private_names(repo_nodes, pr_nodes, review_nodes))
+    meta = {
+        **snapshot.meta,
+        "unreadable_repos": unreadable,
+        "denied": client.denied,
+        "token_expires": client.token_expires,
+    }
     return FetchResult(replace(snapshot, meta=meta), private_names)
+
+
+def _private_names(
+    repo_nodes: list[dict[str, Any]],
+    pr_nodes: list[dict[str, Any]],
+    review_nodes: list[dict[str, Any]],
+) -> list[str]:
+    nodes = [*pr_nodes, *(r for r in review_nodes if r.get("repository"))]
+    return [r["nameWithOwner"] for r in repo_nodes if r["isPrivate"]] + [
+        n["repository"]["nameWithOwner"] for n in nodes if n["repository"]["isPrivate"]
+    ]
+
+
+MIN_SCRUB_TOKEN = 5
+
+
+def public_text_scrubber(aliases: dict[str, str]) -> Callable[[Any], str]:
+    """Blank public free text (titles, commit messages, descriptions) that mentions a private
+    repo by its bare name, e.g. a public PR titled "bump billing-core". Short names are
+    skipped to avoid blanking ordinary words."""
+    tokens = {
+        part.lower()
+        for name in aliases
+        for part in (name.split("/", 1)[-1],)
+        if len(part) >= MIN_SCRUB_TOKEN
+    }
+    pattern = (
+        re.compile(r"(?<![\w-])(" + "|".join(map(re.escape, sorted(tokens))) + r")(?![\w-])", re.I)
+        if tokens
+        else None
+    )
+
+    def scrub(value: Any) -> str:
+        text = str(value or "")
+        return "" if pattern and pattern.search(text) else text
+
+    return scrub
 
 
 def build_snapshot(
@@ -321,15 +399,20 @@ def build_snapshot(
     pr_nodes: list[dict[str, Any]],
     commit_nodes: dict[str, list[dict[str, Any]]],
     now: datetime,
+    review_nodes: list[dict[str, Any]] | None = None,
 ) -> Snapshot:
-    """Convert raw API nodes into an anonymised, immutable Snapshot."""
-    private_names = [r["nameWithOwner"] for r in repo_nodes if r["isPrivate"]] + [
-        p["repository"]["nameWithOwner"] for p in pr_nodes if p["repository"]["isPrivate"]
-    ]
-    aliases = build_alias_map(private_names)
+    """Convert raw API nodes into an anonymised, immutable Snapshot.
+
+    Free text (PR titles, commit messages, descriptions) is kept for public repos only.
+    """
+    review_nodes = review_nodes or []
+    # Sorted so alias numbers don't depend on API result order (e.g. search relevance).
+    aliases = build_alias_map(sorted(set(_private_names(repo_nodes, pr_nodes, review_nodes))))
+    since = now - timedelta(days=config.LOOKBACK_DAYS)
     privacy = {r["nameWithOwner"]: r["isPrivate"] for r in repo_nodes}
 
-    repos = tuple(_repo(r, aliases) for r in repo_nodes)
+    scrub = public_text_scrubber(aliases)
+    repos = tuple(_repo(r, aliases, scrub) for r in repo_nodes)
     commits = tuple(
         Commit(
             repo=alias(name, privacy.get(name, True), aliases),
@@ -337,6 +420,7 @@ def build_snapshot(
             committed_at=_parse_dt(node["committedDate"]),
             additions=int(node.get("additions") or 0),
             deletions=int(node.get("deletions") or 0),
+            message="" if privacy.get(name, True) else scrub(node.get("messageHeadline")),
         )
         for name, nodes in commit_nodes.items()
         for node in nodes
@@ -348,8 +432,26 @@ def build_snapshot(
             created_at=_parse_dt(p["createdAt"]),
             merged_at=_parse_dt(p["mergedAt"]) if p.get("mergedAt") else None,
             state=p["state"],
+            title="" if p["repository"]["isPrivate"] else scrub(p.get("title")),
         )
         for p in pr_nodes
+    )
+    reviews = tuple(
+        Review(
+            repo=alias(n["repository"]["nameWithOwner"], n["repository"]["isPrivate"], aliases),
+            is_private=n["repository"]["isPrivate"],
+            pr_created_at=_parse_dt(n["createdAt"]),
+            reviewed_at=min(_parse_dt(r["submittedAt"]) for r in submitted),
+        )
+        for n in review_nodes
+        if n.get("repository")
+        and (
+            submitted := [
+                r
+                for r in (n.get("reviews") or {}).get("nodes") or []
+                if r and r.get("submittedAt") and _parse_dt(r["submittedAt"]) >= since
+            ]
+        )
     )
     weeks = user["contributionsCollection"]["contributionCalendar"]["weeks"]
     calendar = tuple(
@@ -366,12 +468,15 @@ def build_snapshot(
         repos=repos,
         commits=commits,
         pull_requests=pulls,
+        reviews=reviews,
         meta={"private_repos": len(aliases)},
     )
 
 
-def _repo(node: dict[str, Any], aliases: dict[str, str]) -> Repo:
+def _repo(node: dict[str, Any], aliases: dict[str, str], scrub: Callable[[Any], str]) -> Repo:
     edges = (node.get("languages") or {}).get("edges") or []
+    public = not node["isPrivate"]
+    release = (node.get("latestRelease") or {}) if public else {}
     return Repo(
         name_with_owner=alias(node["nameWithOwner"], node["isPrivate"], aliases),
         is_private=node["isPrivate"],
@@ -383,4 +488,7 @@ def _repo(node: dict[str, Any], aliases: dict[str, str]) -> Repo:
             Language(e["node"]["name"], e["node"].get("color") or "#8b949e", int(e["size"]))
             for e in edges
         ),
+        description=scrub(node.get("description")) if public else "",
+        release_tag=str(release.get("tagName") or ""),
+        release_at=_parse_dt(release["publishedAt"]) if release.get("publishedAt") else None,
     )
