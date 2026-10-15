@@ -77,6 +77,25 @@ def validate_svg(filename: str, svg: str) -> None:
         raise RenderError(f"{filename} is not well-formed XML: {exc}") from exc
 
 
+def denied_ratio(snapshot: Snapshot) -> float:
+    denied = int(snapshot.meta.get("denied", 0))
+    seen = len(snapshot.pull_requests) + len(snapshot.repos) + denied
+    return denied / seen if seen else 0.0
+
+
+def check_completeness(snapshot: Snapshot) -> None:
+    """Refuse to publish when the token was denied a meaningful share of the data."""
+    ratio = denied_ratio(snapshot)
+    if ratio > config.MAX_DENIED_RATIO:
+        denied = snapshot.meta.get("denied", 0)
+        raise PartialDataError(
+            f"GitHub refused {denied} resources ({ratio:.0%}) to this token (see warnings above "
+            "for the reason); keeping the existing panels. Fix the token or pass --allow-partial."
+        )
+    if ratio:
+        log.warning("publishing with %.1f%% of items refused to the token", ratio * 100)
+
+
 def check_for_leaks(outputs: dict[str, str], private_names: frozenset[str]) -> None:
     """Defence in depth: refuse to write anything that contains a real private repo name."""
     needles = [name.lower() for name in private_names]
@@ -117,12 +136,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.save_snapshot:
             payload = json.dumps(fetched.snapshot.to_dict(), indent=1)
             args.save_snapshot.write_text(payload, "utf-8")
-        denied = int(fetched.snapshot.meta.get("denied", 0))
-        if denied and not args.allow_partial:
-            raise PartialDataError(
-                f"GitHub refused {denied} resources to this token (see warnings above for the "
-                "reason); keeping the existing panels. Fix the token or pass --allow-partial."
-            )
+        if not args.allow_partial:
+            check_completeness(fetched.snapshot)
         write_outputs(args, profile, fetched)
     except (
         ConfigError,

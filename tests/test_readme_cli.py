@@ -113,9 +113,20 @@ def test_leak_check_blocks_private_names_without_echoing_them():
 def test_cli_keeps_existing_panels_when_token_was_denied(workspace, snapshot):
     from dataclasses import replace
 
-    denied = replace(snapshot, meta={**snapshot.meta, "denied": 3})
+    denied = replace(snapshot, meta={**snapshot.meta, "denied": 30})
     (workspace / "snap.json").write_text(json.dumps(denied.to_dict()), encoding="utf-8")
     assert cli.main(_args(workspace)) == 1
     assert not (workspace / "assets").exists()
     assert cli.main([*_args(workspace), "--allow-partial"]) == 0
     assert (workspace / "assets").exists()
+
+
+def test_small_denied_share_still_publishes(snapshot, caplog):
+    from dataclasses import replace
+
+    # 1 denied out of 4 PRs + 6 repos + 1 = 1/11 > 5% -> blocked; scale data up instead
+    big = replace(snapshot, pull_requests=snapshot.pull_requests * 30, meta={"denied": 2})
+    assert cli.denied_ratio(big) < 0.05
+    cli.check_completeness(big)
+    assert "refused" in caplog.text
+    cli.check_completeness(replace(snapshot, meta={}))

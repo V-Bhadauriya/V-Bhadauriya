@@ -15,6 +15,8 @@ MAX_RETRIES = 3
 RETRY_BACKOFF_S = 2.0
 MAX_RATE_LIMIT_WAIT_S = 120.0
 MAX_PAGES = 50
+# Publish anyway if GitHub refused at most this share of items (e.g. a teammate's private repo).
+MAX_DENIED_RATIO = 0.05
 
 LOOKBACK_DAYS = 365
 TRACE_WINDOW_DAYS = 14
