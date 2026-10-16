@@ -125,6 +125,6 @@ status:
 
 <p align="center">
 <!-- pulse:footer -->
-<sub>last scrape <code>2026-10-15 UTC</code> · refreshed every 6h by a GitHub Action · rendered by <a href="pulse"><code>pulse</code></a> — no third-party widgets</sub>
+<sub>last scrape <code>2026-10-16 UTC</code> · refreshed every 6h by a GitHub Action · rendered by <a href="pulse"><code>pulse</code></a> — no third-party widgets</sub>
 <!-- /pulse:footer -->
 </p>
