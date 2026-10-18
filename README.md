@@ -45,7 +45,7 @@ spec:
 status:
   phase: Running  # since 2018-10-18
   observedLanguages: [Go, TypeScript, Shell, JavaScript]  # live, recency-weighted
-  recentlyShipped: [niriksha-sdk-go, niriksha-sdk-node, niriksha-sdk-java, niriksha-sdk-python]  # public, last 30d
+  recentlyShipped: [niriksha-sdk-node, niriksha-sdk-go, niriksha-sdk-java, niriksha-sdk-python]  # public, last 30d
 ```
 <!-- /pulse:manifest -->
 
