@@ -44,7 +44,7 @@ spec:
     observability: [OpenTelemetry, Prometheus, Grafana]
 status:
   phase: Running  # since 2018-10-18
-  observedLanguages: [Go, TypeScript, Python, JavaScript]  # live, recency-weighted
+  observedLanguages: [Go, TypeScript, Python, Shell]  # live, recency-weighted
   recentlyShipped: [niriksha-sdk-node, niriksha-sdk-go]  # public, last 30d
 ```
 <!-- /pulse:manifest -->
