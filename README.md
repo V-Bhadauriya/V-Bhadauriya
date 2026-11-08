@@ -45,7 +45,7 @@ spec:
 status:
   phase: Running  # since 2018-10-18
   observedLanguages: [Go, TypeScript, Python, Shell]  # live, recency-weighted
-  recentlyShipped: [niriksha-sdk-node, niriksha-sdk-go]  # public, last 30d
+  recentlyShipped: [niriksha-sdk-node]  # public, last 30d
 ```
 <!-- /pulse:manifest -->
 
@@ -125,6 +125,6 @@ status:
 
 <p align="center">
 <!-- pulse:footer -->
-<sub>last scrape <code>2026-11-07 UTC</code> · refreshed every 6h by a GitHub Action · rendered by <a href="pulse"><code>pulse</code></a> — no third-party widgets</sub>
+<sub>last scrape <code>2026-11-08 UTC</code> · refreshed every 6h by a GitHub Action · rendered by <a href="pulse"><code>pulse</code></a> — no third-party widgets</sub>
 <!-- /pulse:footer -->
 </p>
